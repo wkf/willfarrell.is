@@ -1,7 +1,7 @@
 (ns wkf.dev
   (:require [wkf.style :as style]
             [wkf.markup :as markup]
-            [aviary.system :refer [defsystem* using] :as system]
+            [aviary.system :refer [defsystem defsystem* using] :as system]
             [aviary.serve :refer [serve]]
             [aviary.watch :refer [watch] :as w]
             [aviary.figwheel :as fw]
@@ -45,6 +45,12 @@
               {:port 3449
                :output-to "resources/target/assets/js/out/main.js"
                :output-dir "resources/target/assets/js/out"}))
+
+(defsystem prod
+  (serve
+    {:port 3460
+     :static? true
+     :resources ["public"]}))
 
 (defn start []
   (system/start dev))

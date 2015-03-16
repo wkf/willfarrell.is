@@ -5,7 +5,8 @@
 
 (def defaults
   {:title "Will Farrell"
-   :styles ["css/out/screen.css"]
+   :styles ["css/out/screen.css"
+            "//cloud.typography.com/6114452/688926/css/fonts.css"]
    :scripts ["js/out/main.js"]})
 
 (defn html5 [& nodes]
@@ -27,11 +28,24 @@
         :content "width=device-width, initial-scale=1"}]
       [:title]]
      [:body
-      [:header]
+      [:nav
+       [:a.parens
+        [:span "( )"]]
+       [:a.ellipsis
+        [:span "..."]]]
+      [:header
+       [:h1 "Will Farrell"]
+       [:h2
+        [:span "Hello. "]
+        [:span "I'm a developer. "]
+        [:em "It's nice."]]
+       [:hr]]
       [:main]
-      [:footer]]])
+      [:footer
+       [:hr]
+       [:small "(c) 2015 Will Farrell"]]]])
 
-  [{:keys [title scripts requires styles]} & [head main]]
+  [{:keys [title scripts requires styles]} & [main]]
 
   [:title] (html/content title)
   [:head] (html/prepend
@@ -42,20 +56,12 @@
               #(html [:script {:type "text/javascript" :src %}]) scripts)
             (map
               #(html [:script {:type "text/javascript"} (str "goog.require('" % "')")]) requires))
-  [:header] (html/content head)
   [:main] (html/content main))
 
-(html/defsnippet head
+(html/defsnippet home
   {:parser markdown-parser} "content/home.md"
-  [#{:h1 :h2}] [])
-
-(html/defsnippet cards
-  {:parser markdown-parser} "content/home.md"
-  {[:h3] [:h4]} []
-  [:h4] (html/wrap :aside)
-  {[:h3] [:p]} (html/wrap :article)
-  {[:article] [:aside]} (html/wrap :section))
+  [html/root] [])
 
 (defn manifest [config]
   (let [config (merge defaults config)]
-    {"" #(render (page config (head) (cards)))}))
+    {"" #(render (page config (home)))}))

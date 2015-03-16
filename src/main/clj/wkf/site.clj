@@ -23,6 +23,7 @@
      :build-options {:output-to "resources/public/js/out/main.js"
                      :output-dir "resources/public/js/out"
                      :optimizations :advanced
+                     :source-map "resources/public/js/out/main.map"
                      :pretty-print false}}))
 
 (defn ship []

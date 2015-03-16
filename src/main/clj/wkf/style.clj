@@ -1,10 +1,12 @@
 (ns wkf.style
-  (:require [garden.def :refer [defcssfn]]
+  (:refer-clojure :exclude [rem])
+  (:require [garden.def :refer [defcssfn defkeyframes]]
             [garden.core :refer [css]]
-            [garden.units :refer [px em percent]]
+            [garden.units :refer [px em rem percent]]
             [garden.color :as color :refer [rgb]]
             [garden.stylesheet :refer [at-media]]
             [garden.selectors :as s]))
+
 (def defaults
   {:vendors ["webkit"]
    :auto-prefix #{:box-align
@@ -14,24 +16,20 @@
                   :flex-align
                   :flex-basis
                   :flex-direction
-                  :align-items}})
+                  :align-items
+                  :animation
+                  :animation-name
+                  :animation-delay
+                  :animation-duration
+                  :animation-timing-function
+                  :animation-fill-mode
+                  }})
 
 (def black (rgb 0 0 0 ))
 (def purple (rgb 152 90 163))
 (def white (rgb 255 255 255))
 
 (defcssfn url)
-
-(defn even
-  ([] (even :&))
-  ([selector]
-   ((s/selector selector)
-    (s/nth-child :even))))
-
-(defn font-face [properties urls]
-  ["@font-face"
-   {:src (url urls)
-    :font properties}])
 
 (defn ensure-unit [n]
   (if (number? n) (px n) n))
@@ -45,17 +43,20 @@
                   :right (ensure-unit n2)
                   :bottom (ensure-unit n3)}))
 
-(defn at-medium [properties]
+(defn at-large [rules]
   (at-media
     {:screen true
-     :max-width (px 960)}
-    [:& properties]))
+     :min-width (px 860)} rules))
 
-(defn at-small [properties]
+(defn at-medium [rules]
   (at-media
     {:screen true
-     :max-width (px 640)}
-    [:& properties]))
+     :min-width (px 680)} rules))
+
+(defn at-small [rules]
+  (at-media
+    {:screen true
+     :min-width (px 460)} rules))
 
 (def reset
   [[:html
@@ -77,8 +78,8 @@
    [:fieldset :img
     {:border 0}]
    [:address :caption :cite :code :dfn :em :strong :th :var
-    {:font-style :normal
-     :font-weight :normal}]
+    {:font-style :inherit
+     :font-weight :inherit}]
    [:ol :ul
     {:list-style :none}]
    [:caption :th
@@ -104,166 +105,290 @@
    [:legend
     {:color black}]])
 
-(def fonts
-  [(font-face {:family :brandon-text}
-              "../../fonts/BrandonText-Regular.otf")
-   (font-face {:family :brandon-text
-               :weight :bold}
-              "../../fonts/BrandonText-Bold.otf")
-   (font-face {:family :livory}
-              "../../fonts/Livory-Regular.otf")
-   (font-face {:family :livory
-               :style :italic}
-              "../../fonts/Livory-Italic.otf")
-   (font-face {:family :livory
-               :weight :bold}
-              "../../fonts/Livory-Bold.otf")
-   (font-face {:family :livory
-               :weight :bold
-               :style :italic}
-              "../../fonts/Livory-BoldItalic.otf")
+(def sentinel
+  ["'Sentinel SSm A'"
+   "'Sentinel SSm B'"])
 
-   [:h1 :h2 :h3 :h4
-    {:font-family [:livory :serif]}]
-   [:h3 :h4
-    {:font-weight :bold}
-    [:em
-     {:font-weight :bold}]]
+(def chronicle
+  ["'Chronicle SSm A'"
+   "'Chronicle SSm B'"])
+
+(defn scale-by
+  ([x by] (scale-by x by 0))
+  ([x by n]
+   (if-not (neg? n)
+     (-> (iterate #(* % by) x) (nth n))
+     (-> (iterate #(/ % by) x) (nth (- n))))))
+
+(defn step-by
+  [by n]
+  (->> 0
+       (iterate (partial + by))
+       (filter (partial < n)) first))
+
+(defn ->px [n]
+  (-> n (+ 0.5) int px))
+
+(defn ->rem [n]
+  (-> n (+ 0.5) int (/ 16) float rem))
+
+(defn unit-comparator
+  ([] (unit-comparator :px :em :rem))
+  ([& units]
+   (fn [x y]
+     (let [result (compare (.indexOf units (:unit x))
+                           (.indexOf units (:unit y)))]
+       (if (not= result 0)
+         result
+         (compare (:magnitude x)
+                  (:magnitude y)))))))
+
+(defn rem-and-px [n]
+  (sorted-set-by
+    (unit-comparator :px :rem)
+    (->px n)
+    (->rem n)))
+
+(def base-font-size 20)
+(def base-line-height (* base-font-size 1.5))
+(def base-scale-factor 1.25)
+
+(def font-size
+  (comp rem-and-px
+        (partial scale-by
+                 base-font-size
+                 base-scale-factor)))
+
+(def line-height
+  (comp rem-and-px
+        (partial step-by
+                 base-line-height)
+        (partial scale-by
+                 base-font-size
+                 base-scale-factor)))
+
+(def lines
+  (comp ->rem
+        (partial *
+                 base-line-height)))
+
+(def fonts
+  [[:html
+    {:font-size (percent 80)}
+    (at-small
+     [:&
+      {:font-size (percent 100)}])]
+   [:h1 :h2 :h3 :h4 :nav
+    {:font-family sentinel}]
+   [:h1 :h2
+    {:font-weight 500}]
+   [:h3 :h4 :nav
+    {:font-weight 500}]
    [:h1
-    {:font-size (px 72)}
-    (at-small
-      {:font-size (px 64)})]
+    {:font-size (font-size 3)
+     :line-height (line-height 3)}]
    [:h2
-    {:font-size (px 36)}
-    (at-small
-      {:font-size (px 24)})]
+    {:font-size (font-size 2)
+     :line-height (line-height 2)}]
    [:h3
-    {:font-size (px 24)}]
+    {:font-size (font-size 1)
+     :line-height (line-height 1)}]
    [:h4
-    {:font-size (px 72)}
-    (at-small
-      {:font-size (px 48)})]
+    {:font-size (font-size 0)
+     :line-height (line-height 0)}]
+   [:nav
+    {:font-size (font-size 2)
+     :line-height (line-height 3)}]
    [:p
-    {:font {:size (px 18)
-            :family [:brandon-text :sans-serif]}
-     :line-height (px 26)}]
+    {:font {:family chronicle
+            :size (font-size 0)
+            :weight 300
+            :kerning :normal}
+     :line-height (line-height 0)}
+    [:strong
+     {:font-weight 500}]]
+   [:small
+    {:font {:family sentinel
+            :size (font-size -1)
+            :weight 500}
+     :line-height (line-height 0)}]
    [:em
-    {:font-style :italic}]
-   [:strong
-    {:font-weight :bold}]])
+    {:font-style :italic}]])
+
+(defkeyframes fade-in
+  [:from
+   {:opacity 0}]
+  [:to
+   {:opacity 1}])
+
+(def nav
+  [[:nav {:width (percent 100)
+          :height (lines 2)
+          :padding (sides 0 (lines 1))
+          :position :fixed
+          :background white
+          :top 0
+          :left 0
+          :right 0
+          :z-index 0}
+    (at-large
+      [:&
+       {:background :none
+        :padding (sides (lines 1) (lines 1))
+        :margin (sides 0 :auto (lines 1))
+        :max-width (px 960)}])
+
+    [:a {:color purple
+         :text-align :center}
+     [:span
+      {:transition [:letter-spacing "200ms"]}]
+     [:&:hover
+      [:span
+       {:letter-spacing (->rem 2)}]]
+
+     [:&.parens {:float :left
+                 ;; enough space for the glyphs to stay centered instead of flowing to the right
+                 :width (->rem 54)}]
+     [:&.ellipsis {:float :right
+                   ;; enough space for the glyphs to stay centered instead of flowing to the left
+                   :width (->rem 50)}
+      [:span
+       {:position :relative
+        :top (->rem (- (/ base-line-height 4)))}]]]]])
+
+(def header
+  [[:header
+    {:text-align :center
+     :position :relative
+     :padding (sides
+               (lines 1) :auto (lines 1))}
+
+    [:h1
+     {:z-index 1
+      :position :relative
+      :margin-top (lines 2)
+      :margin-bottom (lines 2)}]
+
+    [:h2
+     {:z-index 1
+      :position :relative
+      :margin-top (lines 2)
+      :margin-bottom (lines 3)}
+     [:span:after
+      {:content "'\\A'"
+       :white-space :pre-wrap}
+      (at-medium
+        [:&
+         {:content "''"}])]]
+
+    [:hr
+     {:position :absolute
+      :left 0
+      :right 0
+      :margin (sides 0 :auto)
+      :transition {:property [:width]
+                   :duration "400ms"}}
+     [:&.fixed
+      {:width (str "calc(100% - " (* base-line-height 2) "px)")
+       :position :fixed
+       :top (lines 2)}
+      (at-large
+        [:& {:position :absolute
+             :width (->rem 280)
+             :top :auto}])]]]])
 
 (def main
+  [[:main
+    {:margin-top (lines 2)}
+
+    [:a
+     {:color purple
+      :font-weight :bold
+      :border-bottom
+      {:width (px 2)
+       :style :solid
+       :color white}
+      :transition [:border "200ms"]}
+     [:&:hover
+      {:border-bottom-color purple}]]]])
+
+(def splash
+  [[:header
+    [:h2
+     [(s/span (s/nth-child 1))
+      {:animation {:name fade-in
+                   :duration "1s"
+                   :fill-mode :backwards
+                   :timing-function :ease}}]
+     [(s/span (s/nth-child 2))
+      {:animation {:name fade-in
+                   :delay "1s"
+                   :duration "1s"
+                   :fill-mode :backwards
+                   :timing-function :ease}}]
+     [(s/em (s/nth-child 3))
+      {:animation {:name fade-in
+                   :delay "2s"
+                   :duration "1s"
+                   :fill-mode :backwards
+                   :timing-function :ease}}]]]
+
+   [:nav :main :footer
+    (s/descendant :header :h1)
+    (s/descendant :header :hr)
+    {:animation {:name fade-in
+                 :delay "3s"
+                 :duration "1s"
+                 :fill-mode :backwards
+                 :timing-function :ease}}]])
+
+(def footer
+  [:footer
+   [:hr
+    {:margin-bottom 0}]
+   [:small
+    {:display :block
+     :text-align :center
+     :margin {:top (lines 1)
+              :bottom (lines 1)}}]])
+
+(def common
   [["::selection"
     {:color white
      :background purple}]
 
-   [:html
-    {:height (percent 100)}]
-
    [:body
-    {:display #{:-webkit-flex :flex}
-     :flex-direction :column
-     :align-items :center
-     :line-height 1
-     :min-height (percent 100)}
-    (at-medium
-      {:align-items :flex-start})]
+    {:max-width (px 760)
+     :margin (sides 0 :auto)
+     :padding (sides 0 (lines 2))}]
 
-   [:header
-    {:width (px 960)
-     :margin (sides 0 15)}
-    (at-medium
-      {:width :auto})
-    (at-small
-      {:width (percent 100)
-       :margin (sides 0)
-       :border-top {:width (px 5)
-                    :color purple
-                    :style :solid}})
+   [:h3
+    {:margin-top (lines 2)}]
 
-    [:h1
-     {:margin (sides 30 15 0)}
-     (at-small
-      {:margin-top (px 20)
-       :text-align :center})]
-    [:h2
-     {:color white
-      :background purple
-      :margin (sides 15 15 30)
-      :padding (sides 5 5)
-      :display :inline-block}
-     (at-small
-      {:width (percent 100)
-       :margin (sides 15 0 0)
-       :text-align :center
-       :line-height (px 30)})]]
+   [:h4 :p :small
+    {:margin {:top (lines 1)
+              :bottom (lines 1)}}]
 
-   [:main
-    {:width (percent 100)
-     :display #{:-webkit-flex :flex}
-     :background (url "../../img/background.png")
-     :flex-wrap :wrap
-     :flex-grow 1
-     :flex-direction :column
-     :align-items :center
-     :padding (px 15)}
-    [:section
-     {:display #{:-webkit-flex :flex}
-      :max-width (px 960)}
-     (at-small
-       {:flex-wrap :wrap
-        :flex-direction :column-reverse})
-     [(even)
-      {:flex-direction :row-reverse}
-      (at-small
-        {:flex-direction :column-reverse})]
-     [:article
-      {:flex-basis (percent (/ 200 3))
-       :background white
-       :margin (px 15)}
-      (at-small
-       {:margin-top 0
-        :flex-basis :auto})]
-     [:aside
-      {:color purple
-       :display #{:-webkit-flex :flex}
-       :flex-grow 1
-       :line-height (px 200)
-       :background white
-       :margin (px 15)}
-      (at-small
-        {:line-height (px 100)
-         :margin-bottom 0})]
-     [:h3
-      {:padding (sides 30 30 0)}
-      (at-small
-        {:padding
-         {:top (px 0)
-          :bottom (px 15)}})]
-     [:h4
-      {:margin :auto
-       :text-align :center}]
-     [:p
-      {:padding (sides 10 30 30)}]]]
-
-   [:footer
-    {:width "100%"
-     :height (px 5)
-     :background purple}]
-
-   [:a
-    {:color purple
-     :font-weight :bold
-     :border-bottom
-     {:width (px 2)
-      :style :solid
-      :color white}
-     :transition [:border "250ms"]}
-    [:&:hover
-     {:border-bottom-color purple}]]])
+   [:hr
+    {:border {:color purple
+              :style :solid
+              :width (px 1)}
+     :width (->rem 280)
+     :margin-top (lines 3)
+     :margin-bottom (lines 3)
+     :transition {:property :width
+                  :duration "300ms"}}]])
 
 (def screen
-  (concat reset fonts main))
+  (concat reset
+          fonts
+          common
+          splash
+          nav
+          header
+          main
+          footer
+          main))
 
 (defn manifest [config]
-  {"css/out/screen.css" #(css (merge defaults config) screen)})
+  {"css/out/screen.css" #(css (merge defaults config) fade-in screen)})

@@ -9,11 +9,12 @@
   :source-paths ["src/main/clj"
                  "src/main/cljs"]
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-2850"]
+                 [org.clojure/clojurescript "0.0-3119"]
                  [aviary "0.1.12"]
                  [enlive "1.1.5"]
                  [garden "1.2.5"]
-                 [endophile "0.1.2"]]
+                 [endophile "0.1.2"]
+                 [prismatic/dommy "1.0.0"]]
   :profiles {:dev {:source-paths ["src/dev/clj"
                                   "src/dev/cljs"]
                    :dependencies [[weasel "0.5.0"]
