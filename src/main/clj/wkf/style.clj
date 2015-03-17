@@ -259,7 +259,6 @@
 (def header
   [[:header
     {:text-align :center
-     :position :relative
      :padding (sides
                (lines 1) :auto (lines 1))}
 
