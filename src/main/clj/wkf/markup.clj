@@ -28,26 +28,53 @@
         :content "width=device-width, initial-scale=1"}]
       [:title]]
      [:body
-      [:nav
-       [:a.parens
-        [:span "( )"]]
-       [:a.ellipsis
-        [:span "..."]]]
-      [:header
-       [:h1 "Will Farrell"]
-       [:h2
-        [:span "Hello. "]
-        [:span "I'm a developer. "]
-        [:em "It's nice."]]
-       [:hr]]
-      [:main]
-      [:footer
-       [:hr]
-       [:small "(c) 2015 Will Farrell"]]]])
+      [:section.page
+       [:div.content
+        [:nav
+         [:a.parens
+          [:span "( )"]]
+         [:a.ellipsis
+          [:span "..."]]]
+        [:header
+         [:h1 "Will Farrell"]
+         [:h2
+          [:span "Hello. "]
+          [:span "I'm a developer. "]
+          [:em "It's nice."]]
+         [:hr]]
+        [:main]
+        [:footer
+         [:hr]
+         [:small "(c) 2015 Will Farrell"]]]]
+      [:section.menu
+       [:div.content
+        [:nav
+         [:a.parens
+          [:span "( )"]]
+         [:a.ellipsis
+          [:span "..."]]]
+        [:header
+         [:h1 "Will Farrell"]
+         [:h2
+          [:span "Hit me up. "]
+          [:em "Seriously."]]
+         [:hr]]
+        [:main
+         [:h3 "GitHub"]
+         [:small [:em "Take a look at some of my work."]]
+         [:h3 "Twitter"]
+         [:small [:em "Say something publicly."]]
+         [:h3 "Email"]
+         [:small [:em "Say something privately (it can be our secret)."]]]
+        [:footer
+         [:hr]
+         [:small "(c) 2015 Will Farrell"]]]]]])
 
   [{:keys [title scripts requires styles]} & [main]]
 
   [:title] (html/content title)
+  [:a.parens] (html/set-attr :href "/")
+  [:a.ellipsis] (html/set-attr :href "#")
   [:head] (html/prepend
             (map
               #(html [:link {:type "text/css" :rel "stylesheet" :href %}]) styles))
@@ -56,7 +83,7 @@
               #(html [:script {:type "text/javascript" :src %}]) scripts)
             (map
               #(html [:script {:type "text/javascript"} (str "goog.require('" % "')")]) requires))
-  [:main] (html/content main))
+  [:.page :main] (html/content main))
 
 (html/defsnippet home
   {:parser markdown-parser} "content/home.md"

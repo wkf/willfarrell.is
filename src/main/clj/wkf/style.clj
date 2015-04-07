@@ -23,6 +23,8 @@
                   :animation-duration
                   :animation-timing-function
                   :animation-fill-mode
+                  :animation-iteration-count
+                  :font-smoothing
                   }})
 
 (def black (rgb 0 0 0 ))
@@ -222,147 +224,204 @@
    {:opacity 1}])
 
 (def nav
-  [[:nav {:width (percent 100)
-          :height (lines 2)
-          :padding (sides 0 (lines 1))
-          :position :fixed
-          :background white
-          :top 0
-          :left 0
-          :right 0
-          :z-index 0}
-    (at-large
-      [:&
-       {:background :none
-        :padding (sides (lines 1) (lines 1))
-        :margin (sides 0 :auto (lines 1))
-        :max-width (px 960)}])
+  [[:.page :.menu
+    [:nav {:width (percent 100)
+           :height (lines 2)
+           :padding [[0 (lines 1)]]
+           :position :absolute
+           :background white
+           :top (lines 1)
+           :left 0
+           :right 0
+           :z-index 1}
+     (at-large
+       [:&
+        {:top (lines 1)
+         :background :none
+         :margin [[0 :auto]]
+         :max-width (px 960)}])
 
-    [:a {:color purple
-         :text-align :center}
-     [:span
-      {:transition [:letter-spacing "200ms"]}]
-     [:&:hover
+     [:a {:color purple
+          :text-align :center}
       [:span
-       {:letter-spacing (->rem 2)}]]
+       {:transition [:letter-spacing "200ms"]}]
+      [:&:hover
+       [:span
+        {:letter-spacing (->rem 2)}]]
 
-     [:&.parens {:float :left
-                 ;; enough space for the glyphs to stay centered instead of flowing to the right
-                 :width (->rem 54)}]
-     [:&.ellipsis {:float :right
-                   ;; enough space for the glyphs to stay centered instead of flowing to the left
-                   :width (->rem 50)}
-      [:span
-       {:position :relative
-        :top (->rem (- (/ base-line-height 4)))}]]]]])
+      [:&.parens {:float :left
+                  ;; enough space for the glyphs to stay centered instead of flowing to the right
+                  :width (->rem 54)}]
+      [:&.ellipsis {:float :right
+                    ;; enough space for the glyphs to stay centered instead of flowing to the left
+                    :width (->rem 50)}
+       [:span
+        {:position :relative
+         :top (->rem (- (/ base-line-height 4)))}]]]]]
+   [:.fix-page-nav
+    [:.page
+     [:nav {:top 0
+            :position :fixed}]]]
+   [:.fix-menu-nav.show-menu
+    [:.menu
+     [:nav {:top 0
+            :position :fixed}]]]])
+
+(def fixed-hr
+  [:hr
+   {:width (str "calc(100% - " (* base-line-height 2) "px)")
+    :position :fixed
+    :top (lines 2)
+    :left 0
+    :right 0}
+   (at-large
+     [:& {:position :absolute
+          :width (->rem 280)
+          :top :auto}])])
 
 (def header
-  [[:header
-    {:text-align :center
-     :padding (sides
-               (lines 1) :auto (lines 1))}
+  [[:.page :.menu
+    [:header
+     {:text-align :center
+      :padding (sides
+                 (lines 1) :auto (lines 1))}
 
-    [:h1
-     {:z-index 1
-      :position :relative
-      :margin-top (lines 2)
-      :margin-bottom (lines 2)}]
-
-    [:h2
-     {:z-index 1
-      :position :relative
-      :margin-top (lines 2)
-      :margin-bottom (lines 3)}
-     [:span:after
-      {:content "'\\A'"
-       :white-space :pre-wrap}
-      (at-medium
-        [:&
-         {:content "''"}])]]
-
-    [:hr
-     {:position :absolute
-      :left 0
-      :right 0
-      :margin (sides 0 :auto)
-      :transition {:property [:width]
-                   :duration "400ms"}}
-     [:&.fixed
-      {:width (str "calc(100% - " (* base-line-height 2) "px)")
-       :position :fixed
-       :top (lines 2)}
+     [:h1
+      {:z-index 1
+       :position :relative}
       (at-large
-        [:& {:position :absolute
-             :width (->rem 280)
-             :top :auto}])]]]])
+        [:&
+         {:margin-bottom (lines 1)}])]
+
+     [:h2
+      {:z-index 1
+       :position :relative
+       :margin-top (lines 1)
+       :margin-bottom (lines 2)}
+      [:span:after
+       {:content "'\\A'"
+        :white-space :pre-wrap}
+       (at-medium
+         [:&
+          {:content "''"}])]]
+
+     [:hr
+      {:position :absolute
+       :left 0
+       :right 0
+       :margin (sides 0 :auto)
+       :z-index 3
+       :transition {:property [:width]
+                    :duration "400ms"}}]]]
+   [:.fix-page-hr
+    [:.page
+     [:header fixed-hr]]]
+   [:.fix-menu-hr
+    [:.menu
+     [:header fixed-hr]]]])
 
 (def main
-  [[:main
-    {:margin-top (lines 2)}
+  [[:.page :.menu
+    [:main
+     {:margin-top (lines 2)}
 
-    [:a
-     {:color purple
-      :font-weight :bold
-      :border-bottom
-      {:width (px 2)
-       :style :solid
-       :color white}
-      :transition [:border "200ms"]}
-     [:&:hover
-      {:border-bottom-color purple}]]]])
+     [:a
+      {:color purple
+       :font-weight :bold
+       :border-bottom
+       {:width (px 2)
+        :style :solid
+        :color white}
+       :transition [:border "200ms"]}
+      [:&:hover
+       {:border-bottom-color purple}]]]]])
 
 (def splash
-  [[:header
-    [:h2
-     [(s/span (s/nth-child 1))
-      {:animation {:name fade-in
-                   :duration "1s"
-                   :fill-mode :backwards
-                   :timing-function :ease}}]
-     [(s/span (s/nth-child 2))
-      {:animation {:name fade-in
-                   :delay "1s"
-                   :duration "1s"
-                   :fill-mode :backwards
-                   :timing-function :ease}}]
-     [(s/em (s/nth-child 3))
-      {:animation {:name fade-in
-                   :delay "2s"
-                   :duration "1s"
-                   :fill-mode :backwards
-                   :timing-function :ease}}]]]
+  [[:.page
+    [:header
+     [:h2
+      [(s/span (s/nth-child 1))
+       {:animation {:name fade-in
+                    :duration "1s"
+                    :fill-mode :backwards
+                    :timing-function :ease}}]
+      [(s/span (s/nth-child 2))
+       {:animation {:name fade-in
+                    :delay "1s"
+                    :duration "1s"
+                    :fill-mode :backwards
+                    :timing-function :ease}}]
+      [(s/em (s/nth-child 3))
+       {:animation {:name fade-in
+                    :delay "2s"
+                    :duration "1s"
+                    :fill-mode :backwards
+                    :timing-function :ease}}]]]]
 
-   [:nav :main :footer
-    (s/descendant :header :h1)
-    (s/descendant :header :hr)
-    {:animation {:name fade-in
-                 :delay "3s"
-                 :duration "1s"
-                 :fill-mode :backwards
-                 :timing-function :ease}}]])
+   [:.page
+    [:nav :main :footer
+     (s/descendant :header :h1)
+     (s/descendant :header :hr)
+     {:animation {:name fade-in
+                  :delay "3s"
+                  :duration "1s"
+                  :fill-mode :backwards
+                  :timing-function :ease}}]]])
 
 (def footer
-  [:footer
-   [:hr
-    {:margin-bottom 0}]
-   [:small
-    {:display :block
-     :text-align :center
-     :margin {:top (lines 1)
-              :bottom (lines 1)}}]])
+  [[:.page :.menu
+    [:footer
+     {:position :absolute
+      :bottom 0
+      :left 0
+      :right 0
+      :height (lines 3)
+      :width (percent 100)
+      :margin-top (lines 3)}
+     [:hr
+      {:margin {:bottom 0}}]
+     [:small
+      {:display :block
+       :text-align :center
+       :margin {:top (lines 1)
+                :bottom (lines 1)}}]]]])
 
 (def common
   [["::selection"
     {:color white
-     :background purple}]
+     :background purple
+     }]
 
-   [:body
+   [:.scrollbar-measure
+    {:width (px 100)
+     :height (px 100)
+     :overflow :scroll
+     :position :absolute
+     :top (px -9999)}]
+
+   [:html :body :.page :.menu
+    {:height (percent 100)}]
+
+   [:html
+    {:overflow-y :scroll}]
+
+   [:.page :.menu
+    [:.content
+     {:min-height "100vh"
+      :position :relative
+      :padding-bottom (lines 5)}]]
+
+   [:header :footer :main
     {:max-width (px 760)
-     :margin (sides 0 :auto)
+     :margin {:left :auto
+              :right :auto}
      :padding (sides 0 (lines 2))}]
 
    [:h3
     {:margin-top (lines 2)}]
+
+   [:small
+    {:display :block}]
 
    [:h4 :p :small
     {:margin {:top (lines 1)
@@ -373,10 +432,60 @@
               :style :solid
               :width (px 1)}
      :width (->rem 280)
-     :margin-top (lines 3)
-     :margin-bottom (lines 3)
+     :margin-top (px -2)
      :transition {:property :width
-                  :duration "300ms"}}]])
+                  :duration "500ms"}}]
+
+   [:.menu
+    {:position :fixed
+     :max-width (percent 0)}]
+   [:.show-menu
+    [:.page
+     {:position :fixed
+      :left 0
+      :right 0}]
+    [:.menu
+     {:position :absolute
+      :max-width (percent 100)
+      :left :auto}
+     [:.content
+      {:float :right}]]]])
+
+;; "cubic-bezier(0, 1, 0.5, 1)"
+
+(def menu
+  [[:.menu
+    {:color white
+     :background purple
+     :top 0
+     :left 0
+     :right 0
+     :z-index 3
+     :height :auto
+     :min-height "100vh"
+     :overflow-x :hidden
+     :transition {:property :max-width
+                  :duration "500ms"}
+     }
+    [:.content
+     {:min-height "100vh"
+      ;; this isn't quite right because it doesn't account for the scrollbar, so it gets calculated dynamically at runtime
+      :width "100vw"
+      :float :left}]
+
+    [:h3
+     {:margin {:top (lines 1)
+               :bottom (lines 1)}}]
+    [:nav
+     {:background purple}
+     [:a
+      [:span
+       {:color white}]]]
+
+    [:hr
+     {:border-color :white}]]
+
+   ])
 
 (def screen
   (concat reset
@@ -387,7 +496,8 @@
           header
           main
           footer
-          main))
+          main
+          menu))
 
 (defn manifest [config]
   {"css/out/screen.css" #(css (merge defaults config) fade-in screen)})
