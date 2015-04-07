@@ -5,15 +5,15 @@ goog.require('cljs.core');
  * Dissociate this keyseq from m, removing any empty maps created as a result
  * (including at the top-level).
  */
-dommy.utils.dissoc_in = (function dommy$utils$dissoc_in(m,p__37599){
-var vec__37607 = p__37599;
-var k = cljs.core.nth.cljs$core$IFn$_invoke$arity$3(vec__37607,(0),null);
-var ks = cljs.core.nthnext(vec__37607,(1));
+dommy.utils.dissoc_in = (function dommy$utils$dissoc_in(m,p__37820){
+var vec__37828 = p__37820;
+var k = cljs.core.nth.cljs$core$IFn$_invoke$arity$3(vec__37828,(0),null);
+var ks = cljs.core.nthnext(vec__37828,(1));
 if(cljs.core.truth_(m)){
 var temp__4124__auto__ = (function (){var and__24165__auto__ = ks;
 if(and__24165__auto__){
-return dommy$utils$dissoc_in((function (){var G__37609 = k;
-return (m.cljs$core$IFn$_invoke$arity$1 ? m.cljs$core$IFn$_invoke$arity$1(G__37609) : m.call(null,G__37609));
+return dommy$utils$dissoc_in((function (){var G__37830 = k;
+return (m.cljs$core$IFn$_invoke$arity$1 ? m.cljs$core$IFn$_invoke$arity$1(G__37830) : m.call(null,G__37830));
 })(),ks);
 } else {
 return and__24165__auto__;
@@ -43,9 +43,9 @@ return Array.prototype.slice.call(array_like);
  */
 dommy.utils.as_str = (function dommy$utils$as_str(s){
 if((s instanceof cljs.core.Keyword)){
-return [cljs.core.str((function (){var G__37611 = cljs.core.namespace(s);
-var G__37611__$1 = (((G__37611 == null))?null:[cljs.core.str(G__37611),cljs.core.str("/")].join(''));
-return G__37611__$1;
+return [cljs.core.str((function (){var G__37832 = cljs.core.namespace(s);
+var G__37832__$1 = (((G__37832 == null))?null:[cljs.core.str(G__37832),cljs.core.str("/")].join(''));
+return G__37832__$1;
 })()),cljs.core.str(cljs.core.name(s))].join('');
 } else {
 return s;
@@ -81,8 +81,8 @@ if((i >= (0))){
 if(dommy.utils.class_match_QMARK_(class_name,class$,i)){
 return i;
 } else {
-var G__37612 = (i + class$.length);
-start_from = G__37612;
+var G__37833 = (i + class$.length);
+start_from = G__37833;
 continue;
 }
 } else {
@@ -98,10 +98,10 @@ var class_len = class_name.length;
 var temp__4124__auto__ = dommy.utils.class_index(class_name,class$);
 if(cljs.core.truth_(temp__4124__auto__)){
 var i = temp__4124__auto__;
-var G__37613 = (function (){var end = (i + class$.length);
+var G__37834 = (function (){var end = (i + class$.length);
 return [cljs.core.str((((end < class_len))?[cljs.core.str(class_name.substring((0),i)),cljs.core.str(class_name.substr((end + (1))))].join(''):class_name.substring((0),(i - (1)))))].join('');
 })();
-class_name = G__37613;
+class_name = G__37834;
 continue;
 } else {
 return class_name;
