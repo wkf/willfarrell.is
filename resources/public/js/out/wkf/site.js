@@ -353,6 +353,12 @@ cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.cor
 
 wkf.site.position_BANG_(wkf.site.page,(- y));
 
+window.setTimeout(((function (vec__30762,x,y,map__30763,map__30763__$1,menu_scroll){
+return (function (){
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,true,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
+});})(vec__30762,x,y,map__30763,map__30763__$1,menu_scroll))
+,(500));
+
 var G__30765_30768 = wkf.site.menu;
 var G__30766_30769 = wkf.site.transition_end;
 var G__30767_30770 = wkf.site.wrap_exact_target(((function (G__30765_30768,G__30766_30769,vec__30762,x,y,map__30763,map__30763__$1,menu_scroll){
@@ -394,6 +400,12 @@ var map__30782__$1 = ((cljs.core.seq_QMARK_(map__30782))?cljs.core.apply.cljs$co
 var fix_menu_hr = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30782__$1,cljs.core.constant$keyword$fix_DASH_menu_DASH_hr);
 var fix_menu_nav = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30782__$1,cljs.core.constant$keyword$fix_DASH_menu_DASH_nav);
 cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_scroll,y,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,true], 0));
+
+window.setTimeout(((function (vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
+return (function (){
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,false,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
+});})(vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
+,(500));
 
 var G__30784_30787 = wkf.site.menu;
 var G__30785_30788 = wkf.site.transition_end;

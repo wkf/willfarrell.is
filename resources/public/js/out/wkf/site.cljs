@@ -183,6 +183,12 @@
              :page-scroll y
              :menu-animating? true)
       (position! page (- y))
+      (.setTimeout
+        js/window
+        (fn []
+          (swap! site assoc
+                 :menu-showing? true
+                 :menu-animating? false)) 500)
       (events/listenOnce
         menu
         transition-end
@@ -208,6 +214,12 @@
       (swap! site assoc
              :menu-scroll y
              :menu-animating? true)
+      (.setTimeout
+        js/window
+        (fn []
+          (swap! site assoc
+                 :menu-showing? false
+                 :menu-animating? false)) 500)
       (events/listenOnce
         menu
         transition-end
