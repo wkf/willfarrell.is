@@ -69,8 +69,11 @@
 (defn measure-scroll-width []
   (style/getScrollbarWidth))
 
-(defn measure-content-width [scroll-width]
-  (- (.-innerWidth js/window) scroll-width))
+(defn measure-window-width []
+  (.-innerWidth js/window))
+
+(defn measure-content-width [window-width scroll-width]
+  (- window-width scroll-width))
 
 (defn measure-page-thresholds [line-height]
   (let [[_ page-header-height] (get-size page-header)]
@@ -84,11 +87,16 @@
 
 (defn cache-measurements! []
   (let [line-height (measure-line-height)
-        scroll-width (measure-scroll-width)]
+        scroll-width (measure-scroll-width)
+        window-width (measure-window-width)]
     (swap! site assoc
+           :at-large? (>= window-width 860)
+           :at-medium? (>= window-width 680)
+           :at-small? (>= window-width 460)
            :line-height line-height
            :scroll-width scroll-width
-           :content-width (measure-content-width scroll-width)
+           :window-width window-width
+           :content-width (measure-content-width window-width scroll-width)
            :page-thresholds (measure-page-thresholds line-height)
            :menu-thresholds (measure-menu-thresholds line-height))))
 
@@ -192,7 +200,8 @@
 (defn on-click-menu-ellipsis [e]
   (when-not (:menu-animating? @site)
     (let [[x y] (get-scroll)
-          {:keys [page-scroll
+          {:keys [at-large?
+                  page-scroll
                   menu-thresholds]} @site
           {:keys [fix-menu-nav
                   fix-menu-hr]} menu-thresholds]
@@ -213,7 +222,7 @@
       (scroll-to! x page-scroll)
       (when (>= y fix-menu-nav)
         (absolutize-menu-nav! y))
-      (when (>= y fix-menu-hr)
+      (when (and  (>= y fix-menu-hr) (not at-large?))
         (absolutize-menu-hr! y)))))
 
 (def handlers

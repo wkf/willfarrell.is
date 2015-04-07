@@ -56,8 +56,11 @@ return goog.style.getSize(G__30649);
 wkf.site.measure_scroll_width = (function wkf$site$measure_scroll_width(){
 return goog.style.getScrollbarWidth();
 });
-wkf.site.measure_content_width = (function wkf$site$measure_content_width(scroll_width){
-return (window.innerWidth - scroll_width);
+wkf.site.measure_window_width = (function wkf$site$measure_window_width(){
+return window.innerWidth;
+});
+wkf.site.measure_content_width = (function wkf$site$measure_content_width(window_width,scroll_width){
+return (window_width - scroll_width);
 });
 wkf.site.measure_page_thresholds = (function wkf$site$measure_page_thresholds(line_height){
 var vec__30651 = wkf.site.get_size(wkf.site.page_header);
@@ -74,7 +77,8 @@ return new cljs.core.PersistentArrayMap(null, 2, [cljs.core.constant$keyword$fix
 wkf.site.cache_measurements_BANG_ = (function wkf$site$cache_measurements_BANG_(){
 var line_height = wkf.site.measure_line_height();
 var scroll_width = wkf.site.measure_scroll_width();
-return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$line_DASH_height,line_height,cljs.core.array_seq([cljs.core.constant$keyword$scroll_DASH_width,scroll_width,cljs.core.constant$keyword$content_DASH_width,wkf.site.measure_content_width(scroll_width),cljs.core.constant$keyword$page_DASH_thresholds,wkf.site.measure_page_thresholds(line_height),cljs.core.constant$keyword$menu_DASH_thresholds,wkf.site.measure_menu_thresholds(line_height)], 0));
+var window_width = wkf.site.measure_window_width();
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$at_DASH_large_QMARK_,(window_width >= (860)),cljs.core.array_seq([cljs.core.constant$keyword$at_DASH_medium_QMARK_,(window_width >= (680)),cljs.core.constant$keyword$at_DASH_small_QMARK_,(window_width >= (460)),cljs.core.constant$keyword$line_DASH_height,line_height,cljs.core.constant$keyword$scroll_DASH_width,scroll_width,cljs.core.constant$keyword$window_DASH_width,window_width,cljs.core.constant$keyword$content_DASH_width,wkf.site.measure_content_width(window_width,scroll_width),cljs.core.constant$keyword$page_DASH_thresholds,wkf.site.measure_page_thresholds(line_height),cljs.core.constant$keyword$menu_DASH_thresholds,wkf.site.measure_menu_thresholds(line_height)], 0));
 });
 wkf.site.on_scroll = (function wkf$site$on_scroll(e){
 var map__30672 = (function (){var G__30675 = wkf.site.site;
@@ -384,6 +388,7 @@ return (cljs.core.deref.cljs$core$IFn$_invoke$arity$1 ? cljs.core.deref.cljs$cor
 var map__30781__$1 = ((cljs.core.seq_QMARK_(map__30781))?cljs.core.apply.cljs$core$IFn$_invoke$arity$2(cljs.core.hash_map,map__30781):map__30781);
 var menu_thresholds = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30781__$1,cljs.core.constant$keyword$menu_DASH_thresholds);
 var page_scroll = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30781__$1,cljs.core.constant$keyword$page_DASH_scroll);
+var at_large_QMARK_ = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30781__$1,cljs.core.constant$keyword$at_DASH_large_QMARK_);
 var map__30782 = menu_thresholds;
 var map__30782__$1 = ((cljs.core.seq_QMARK_(map__30782))?cljs.core.apply.cljs$core$IFn$_invoke$arity$2(cljs.core.hash_map,map__30782):map__30782);
 var fix_menu_hr = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30782__$1,cljs.core.constant$keyword$fix_DASH_menu_DASH_hr);
@@ -392,10 +397,10 @@ cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.cor
 
 var G__30784_30787 = wkf.site.menu;
 var G__30785_30788 = wkf.site.transition_end;
-var G__30786_30789 = wkf.site.wrap_exact_target(((function (G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
+var G__30786_30789 = wkf.site.wrap_exact_target(((function (G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
 return (function (e__$1){
 return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,false,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
-});})(G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
+});})(G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
 );
 goog.events.listenOnce(G__30784_30787,G__30785_30788,G__30786_30789);
 
@@ -412,7 +417,7 @@ wkf.site.absolutize_menu_nav_BANG_(y);
 } else {
 }
 
-if((y >= fix_menu_hr)){
+if(((y >= fix_menu_hr)) && (cljs.core.not(at_large_QMARK_))){
 return wkf.site.absolutize_menu_hr_BANG_(y);
 } else {
 return null;

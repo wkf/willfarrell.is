@@ -271,9 +271,7 @@
   [:hr
    {:width (str "calc(100% - " (* base-line-height 2) "px)")
     :position :fixed
-    :top (lines 2)
-    :left 0
-    :right 0}
+    :top (lines 2)}
    (at-large
      [:& {:position :absolute
           :width (->rem 280)
@@ -467,6 +465,7 @@
      :transition {:property :max-width
                   :duration "500ms"}
      }
+
     [:.content
      {:min-height "100vh"
       ;; this isn't quite right because it doesn't account for the scrollbar, so it gets calculated dynamically at runtime
@@ -478,6 +477,9 @@
                :bottom (lines 1)}}]
     [:nav
      {:background purple}
+     (at-large
+       [:&
+        {:background :none}])
      [:a
       [:span
        {:color white}]]]
