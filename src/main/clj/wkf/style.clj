@@ -25,6 +25,7 @@
                   :animation-fill-mode
                   :animation-iteration-count
                   :font-smoothing
+                  :transform
                   }})
 
 (def black (rgb 0 0 0 ))
@@ -233,7 +234,8 @@
            :top (lines 1)
            :left 0
            :right 0
-           :z-index 1}
+           :z-index 1
+           :transform "translatez(0)"}
      (at-large
        [:&
         {:top (lines 1)
@@ -271,6 +273,7 @@
   [:hr
    {:width (str "calc(100% - " (* base-line-height 2) "px)")
     :position :fixed
+    :transform "translateZ(0)"
     :top (lines 2)}
    (at-large
      [:& {:position :absolute
@@ -286,6 +289,7 @@
 
      [:h1
       {:z-index 1
+       :transform "translateZ(1px)"
        :position :relative}
       (at-large
         [:&
@@ -293,6 +297,7 @@
 
      [:h2
       {:z-index 1
+       :transform "translateZ(1px)"
        :position :relative
        :margin-top (lines 1)
        :margin-bottom (lines 2)}
@@ -308,7 +313,7 @@
        :left 0
        :right 0
        :margin (sides 0 :auto)
-       :z-index 3
+       :z-index 2
        :transition {:property [:width]
                     :duration "400ms"}}]]]
    [:.fix-page-hr
@@ -321,7 +326,7 @@
 (def main
   [[:.page :.menu
     [:main
-     {:margin-top (lines 2)}
+     {:margin-top (lines 1)}
 
      [:a
       {:color purple
@@ -458,7 +463,7 @@
      :top 0
      :left 0
      :right 0
-     :z-index 3
+     :z-index 2
      :height :auto
      :min-height "100vh"
      :overflow-x :hidden
@@ -473,8 +478,12 @@
       :float :left}]
 
     [:h3
-     {:margin {:top (lines 1)
-               :bottom (lines 1)}}]
+     {:line-height (lines 2)
+      :margin {:top (lines 1)
+               :bottom (lines 0)}}]
+    [:small
+     {:margin {:top (lines 0)}}
+     ]
     [:nav
      {:background purple}
      (at-large
@@ -486,6 +495,9 @@
 
     [:hr
      {:border-color :white}]]
+   [:.lift-menu
+    [:.menu
+     {:transform "translateZ(2px)"}]]
 
    ])
 

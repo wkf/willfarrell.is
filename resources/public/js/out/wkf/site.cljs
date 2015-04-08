@@ -194,6 +194,7 @@
         transition-end
         (wrap-exact-target
           (fn [e]
+            (dommy/remove-class! html :lift-menu)
             (unabsolutize! menu-nav)
             (unabsolutize! menu-hr)
             (unposition! menu)
@@ -235,7 +236,8 @@
       (when (>= y fix-menu-nav)
         (absolutize-menu-nav! y))
       (when (and  (>= y fix-menu-hr) (not at-large?))
-        (absolutize-menu-hr! y)))))
+        (absolutize-menu-hr! y))
+      (dommy/add-class! html :lift-menu))))
 
 (def handlers
   [[js/window "resize" on-resize]
