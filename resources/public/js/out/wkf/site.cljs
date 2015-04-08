@@ -6,7 +6,6 @@
             [dommy.core :refer-macros [sel sel1] :as dommy]))
 
 ;; TODO:
-;;   - fix racey transitionend listener
 ;;   - fast click
 ;;   - fix elastic/rubber band scrolling
 ;;   - change copy every time you open the menu.
@@ -185,18 +184,6 @@
              :page-scroll y
              :menu-animating? true)
       (dommy/add-class! html :showing-menu)
-      (events/listenOnce
-        menu
-        transition-end
-        (wrap-exact-target
-          (fn [e]
-            (.log js/console "on-click-page")
-            (unabsolutize! menu-nav)
-            (unabsolutize! menu-hr)
-            (dommy/remove-class! html :showing-menu)
-            (swap! site assoc
-                   :menu-showing? true
-                   :menu-animating? false))))
       (position! page (- y))
       (dommy/add-class! html :show-menu)
       (unposition! menu)
@@ -218,24 +205,31 @@
       (when (and  (>= y fix-menu-hr) (not at-large?))
         (absolutize-menu-hr! y))
       (dommy/add-class! html :hiding-menu)
-      (events/listenOnce
-        menu
-        transition-end
-        (wrap-exact-target
-          (fn [e]
-            (.log js/console "on-click-menu")
-            (dommy/remove-class! html :hiding-menu)
-            (swap! site assoc
-                   :menu-showing? false
-                   :menu-animating? false))))
       (position! menu (- y))
       (dommy/remove-class! html :show-menu)
       (unposition! page)
       (scroll-to! x page-scroll))))
 
+(defn on-transition-end [e]
+  (when (:menu-animating? @site)
+    (if (:menu-showing? @site)
+      (do
+        (dommy/remove-class! html :hiding-menu)
+        (swap! site assoc
+               :menu-showing? false))
+      (do
+        (unabsolutize! menu-nav)
+        (unabsolutize! menu-hr)
+        (dommy/remove-class! html :showing-menu)
+        (swap! site assoc
+               :menu-showing? true)))
+    (swap! site assoc :menu-animating? false)))
+
 (def handlers
   [[js/window "resize" on-resize]
    [js/window "scroll" on-scroll]
+   [menu transition-end (wrap-exact-target
+                          on-transition-end)]
    [page-ellipsis "click" (wrap-prevent-default
                             on-click-page-ellipsis)]
    [menu-ellipsis "click" (wrap-prevent-default
