@@ -406,7 +406,8 @@
     {:height (percent 100)}]
 
    [:html
-    {:overflow-y :scroll}]
+    {:overflow-x :hidden
+     :overflow-y :scroll}]
 
    [:.page :.menu
     [:.content
@@ -441,7 +442,10 @@
 
    [:.menu
     {:position :fixed
-     :max-width (percent 0)}]
+     :transform "translateX(100%)"}
+    [:.content
+     {:transform "translateX(-100%)"}]]
+
    [:.show-menu
     [:.page
      {:position :fixed
@@ -449,10 +453,31 @@
       :right 0}]
     [:.menu
      {:position :absolute
-      :max-width (percent 100)
-      :left :auto}
+      :transform :none}
      [:.content
-      {:float :right}]]]])
+      {:transform :none}]]]
+   [:.showing-menu
+    [:.menu
+     {:transform "translateX(0)"
+      :transition {:property :transform
+                   :duration "500ms"}}
+     [:.content
+      {:transform "translateX(0)"
+       :transition {:property :transform
+                    :duration "500ms"}}]]]
+   [:.hiding-menu
+    [:.page
+     [:header
+      [:h1 :h2
+       {:transform "translateZ(0)"}]]]
+    [:.menu
+     {:transform "translateX(-100%)"
+      :transition {:property :transform
+                   :duration "500ms"}}
+     [:.content
+      {:transform "translateX(100%)"
+       :transition {:property :transform
+                    :duration "500ms"}}]]]])
 
 ;; "cubic-bezier(0, 1, 0.5, 1)"
 
@@ -466,24 +491,19 @@
      :z-index 2
      :height :auto
      :min-height "100vh"
-     :overflow-x :hidden
-     :transition {:property :max-width
-                  :duration "500ms"}
-     }
+     :overflow-x :hidden}
 
     [:.content
      {:min-height "100vh"
       ;; this isn't quite right because it doesn't account for the scrollbar, so it gets calculated dynamically at runtime
-      :width "100vw"
-      :float :left}]
+      :width "100vw"}]
 
     [:h3
      {:line-height (lines 2)
       :margin {:top (lines 1)
                :bottom (lines 0)}}]
     [:small
-     {:margin {:top (lines 0)}}
-     ]
+     {:margin {:top (lines 0)}}]
     [:nav
      {:background purple}
      (at-large
@@ -494,12 +514,7 @@
        {:color white}]]]
 
     [:hr
-     {:border-color :white}]]
-   [:.lift-menu
-    [:.menu
-     {:transform "translateZ(2px)"}]]
-
-   ])
+     {:border-color :white}]]])
 
 (def screen
   (concat reset

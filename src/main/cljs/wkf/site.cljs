@@ -6,7 +6,9 @@
             [dommy.core :refer-macros [sel sel1] :as dommy]))
 
 ;; TODO:
-;;   - scroll page so that glyphs align
+;;   - fix racey transitionend listener
+;;   - fast click
+;;   - fix elastic/rubber band scrolling
 ;;   - change copy every time you open the menu.
 ;;   - set timeout to remeasure scrollbar width
 
@@ -182,27 +184,23 @@
       (swap! site assoc
              :page-scroll y
              :menu-animating? true)
-      (position! page (- y))
-      (.setTimeout
-        js/window
-        (fn []
-          (swap! site assoc
-                 :menu-showing? true
-                 :menu-animating? false)) 500)
+      (dommy/add-class! html :showing-menu)
       (events/listenOnce
         menu
         transition-end
         (wrap-exact-target
           (fn [e]
-            (dommy/remove-class! html :lift-menu)
+            (.log js/console "on-click-page")
             (unabsolutize! menu-nav)
             (unabsolutize! menu-hr)
-            (unposition! menu)
+            (dommy/remove-class! html :showing-menu)
             (swap! site assoc
                    :menu-showing? true
-                   :menu-animating? false)
-            (scroll-to! x menu-scroll))))
-      (dommy/toggle-class! html :show-menu))))
+                   :menu-animating? false))))
+      (position! page (- y))
+      (dommy/add-class! html :show-menu)
+      (unposition! menu)
+      (scroll-to! x menu-scroll))))
 
 (defn on-click-menu-ellipsis [e]
   (when-not (:menu-animating? @site)
@@ -215,29 +213,25 @@
       (swap! site assoc
              :menu-scroll y
              :menu-animating? true)
-      (.setTimeout
-        js/window
-        (fn []
-          (swap! site assoc
-                 :menu-showing? false
-                 :menu-animating? false)) 500)
+      (when (>= y fix-menu-nav)
+        (absolutize-menu-nav! y))
+      (when (and  (>= y fix-menu-hr) (not at-large?))
+        (absolutize-menu-hr! y))
+      (dommy/add-class! html :hiding-menu)
       (events/listenOnce
         menu
         transition-end
         (wrap-exact-target
           (fn [e]
+            (.log js/console "on-click-menu")
+            (dommy/remove-class! html :hiding-menu)
             (swap! site assoc
                    :menu-showing? false
                    :menu-animating? false))))
       (position! menu (- y))
-      (dommy/toggle-class! html :show-menu)
+      (dommy/remove-class! html :show-menu)
       (unposition! page)
-      (scroll-to! x page-scroll)
-      (when (>= y fix-menu-nav)
-        (absolutize-menu-nav! y))
-      (when (and  (>= y fix-menu-hr) (not at-large?))
-        (absolutize-menu-hr! y))
-      (dommy/add-class! html :lift-menu))))
+      (scroll-to! x page-scroll))))
 
 (def handlers
   [[js/window "resize" on-resize]
