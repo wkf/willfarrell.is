@@ -363,6 +363,8 @@ var G__30765_30768 = wkf.site.menu;
 var G__30766_30769 = wkf.site.transition_end;
 var G__30767_30770 = wkf.site.wrap_exact_target(((function (G__30765_30768,G__30766_30769,vec__30762,x,y,map__30763,map__30763__$1,menu_scroll){
 return (function (e__$1){
+dommy.core.remove_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$lift_DASH_menu);
+
 wkf.site.unabsolutize_BANG_(wkf.site.menu_nav);
 
 wkf.site.unabsolutize_BANG_(wkf.site.menu_hr);
@@ -430,10 +432,11 @@ wkf.site.absolutize_menu_nav_BANG_(y);
 }
 
 if(((y >= fix_menu_hr)) && (cljs.core.not(at_large_QMARK_))){
-return wkf.site.absolutize_menu_hr_BANG_(y);
+wkf.site.absolutize_menu_hr_BANG_(y);
 } else {
-return null;
 }
+
+return dommy.core.add_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$lift_DASH_menu);
 }
 });
 wkf.site.handlers = new cljs.core.PersistentVector(null, 4, 5, cljs.core.PersistentVector.EMPTY_NODE, [new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [window,"resize",wkf.site.on_resize], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [window,"scroll",wkf.site.on_scroll], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.page_ellipsis,"click",wkf.site.wrap_prevent_default(wkf.site.on_click_page_ellipsis)], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.menu_ellipsis,"click",wkf.site.wrap_prevent_default(wkf.site.on_click_menu_ellipsis)], null)], null);

@@ -16,6 +16,7 @@ cljs.core.constant$keyword$validator = new cljs.core.Keyword(null,"validator","v
 cljs.core.constant$keyword$mouseenter = new cljs.core.Keyword(null,"mouseenter","mouseenter",-1792413560);
 cljs.core.constant$keyword$default = new cljs.core.Keyword(null,"default","default",-1987822328);
 cljs.core.constant$keyword$at_DASH_small_QMARK_ = new cljs.core.Keyword(null,"at-small?","at-small?",-167447383);
+cljs.core.constant$keyword$lift_DASH_menu = new cljs.core.Keyword(null,"lift-menu","lift-menu",-593125175);
 cljs.core.constant$keyword$mouseout = new cljs.core.Keyword(null,"mouseout","mouseout",2049446890);
 cljs.core.constant$keyword$width = new cljs.core.Keyword(null,"width","width",-384071477);
 cljs.core.constant$keyword$menu_DASH_animating_QMARK_ = new cljs.core.Keyword(null,"menu-animating?","menu-animating?",1517215179);
