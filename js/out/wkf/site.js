@@ -351,34 +351,32 @@ var map__30763__$1 = ((cljs.core.seq_QMARK_(map__30763))?cljs.core.apply.cljs$co
 var menu_scroll = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30763__$1,cljs.core.constant$keyword$menu_DASH_scroll);
 cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$page_DASH_scroll,y,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,true], 0));
 
-wkf.site.position_BANG_(wkf.site.page,(- y));
-
-window.setTimeout(((function (vec__30762,x,y,map__30763,map__30763__$1,menu_scroll){
-return (function (){
-return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,true,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
-});})(vec__30762,x,y,map__30763,map__30763__$1,menu_scroll))
-,(500));
+dommy.core.add_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$showing_DASH_menu);
 
 var G__30765_30768 = wkf.site.menu;
 var G__30766_30769 = wkf.site.transition_end;
 var G__30767_30770 = wkf.site.wrap_exact_target(((function (G__30765_30768,G__30766_30769,vec__30762,x,y,map__30763,map__30763__$1,menu_scroll){
 return (function (e__$1){
-dommy.core.remove_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$lift_DASH_menu);
+console.log("on-click-page");
 
 wkf.site.unabsolutize_BANG_(wkf.site.menu_nav);
 
 wkf.site.unabsolutize_BANG_(wkf.site.menu_hr);
 
-wkf.site.unposition_BANG_(wkf.site.menu);
+dommy.core.remove_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$showing_DASH_menu);
 
-cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,true,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
-
-return wkf.site.scroll_to_BANG_(x,menu_scroll);
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,true,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
 });})(G__30765_30768,G__30766_30769,vec__30762,x,y,map__30763,map__30763__$1,menu_scroll))
 );
 goog.events.listenOnce(G__30765_30768,G__30766_30769,G__30767_30770);
 
-return dommy.core.toggle_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$show_DASH_menu);
+wkf.site.position_BANG_(wkf.site.page,(- y));
+
+dommy.core.add_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$show_DASH_menu);
+
+wkf.site.unposition_BANG_(wkf.site.menu);
+
+return wkf.site.scroll_to_BANG_(x,menu_scroll);
 }
 });
 wkf.site.on_click_menu_ellipsis = (function wkf$site$on_click_menu_ellipsis(e){
@@ -403,29 +401,6 @@ var fix_menu_hr = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30782__$1,clj
 var fix_menu_nav = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__30782__$1,cljs.core.constant$keyword$fix_DASH_menu_DASH_nav);
 cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_scroll,y,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,true], 0));
 
-window.setTimeout(((function (vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
-return (function (){
-return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,false,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
-});})(vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
-,(500));
-
-var G__30784_30787 = wkf.site.menu;
-var G__30785_30788 = wkf.site.transition_end;
-var G__30786_30789 = wkf.site.wrap_exact_target(((function (G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
-return (function (e__$1){
-return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,false,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
-});})(G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
-);
-goog.events.listenOnce(G__30784_30787,G__30785_30788,G__30786_30789);
-
-wkf.site.position_BANG_(wkf.site.menu,(- y));
-
-dommy.core.toggle_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$show_DASH_menu);
-
-wkf.site.unposition_BANG_(wkf.site.page);
-
-wkf.site.scroll_to_BANG_(x,page_scroll);
-
 if((y >= fix_menu_nav)){
 wkf.site.absolutize_menu_nav_BANG_(y);
 } else {
@@ -436,7 +411,28 @@ wkf.site.absolutize_menu_hr_BANG_(y);
 } else {
 }
 
-return dommy.core.add_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$lift_DASH_menu);
+dommy.core.add_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$hiding_DASH_menu);
+
+var G__30784_30787 = wkf.site.menu;
+var G__30785_30788 = wkf.site.transition_end;
+var G__30786_30789 = wkf.site.wrap_exact_target(((function (G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav){
+return (function (e__$1){
+console.log("on-click-menu");
+
+dommy.core.remove_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$hiding_DASH_menu);
+
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,false,cljs.core.array_seq([cljs.core.constant$keyword$menu_DASH_animating_QMARK_,false], 0));
+});})(G__30784_30787,G__30785_30788,vec__30780,x,y,map__30781,map__30781__$1,menu_thresholds,page_scroll,at_large_QMARK_,map__30782,map__30782__$1,fix_menu_hr,fix_menu_nav))
+);
+goog.events.listenOnce(G__30784_30787,G__30785_30788,G__30786_30789);
+
+wkf.site.position_BANG_(wkf.site.menu,(- y));
+
+dommy.core.remove_class_BANG_.cljs$core$IFn$_invoke$arity$2(wkf.site.html,cljs.core.constant$keyword$show_DASH_menu);
+
+wkf.site.unposition_BANG_(wkf.site.page);
+
+return wkf.site.scroll_to_BANG_(x,page_scroll);
 }
 });
 wkf.site.handlers = new cljs.core.PersistentVector(null, 4, 5, cljs.core.PersistentVector.EMPTY_NODE, [new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [window,"resize",wkf.site.on_resize], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [window,"scroll",wkf.site.on_scroll], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.page_ellipsis,"click",wkf.site.wrap_prevent_default(wkf.site.on_click_page_ellipsis)], null),new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.menu_ellipsis,"click",wkf.site.wrap_prevent_default(wkf.site.on_click_menu_ellipsis)], null)], null);
