@@ -60,11 +60,11 @@
           [:em "Seriously."]]
          [:hr]]
         [:main
-         [:h3 "GitHub"]
+         [:h3 [:a {:href "https://github.com/wkf"} "GitHub"]]
          [:small [:em "Take a look at some of my work."]]
-         [:h3 "Twitter"]
+         [:h3 [:a {:href "https://twitter.com/wkf"} "Twitter"]]
          [:small [:em "Say something publicly."]]
-         [:h3 "Email"]
+         [:h3 [:a {:href "mailto:yes@willfarrell.is"} "Email"]]
          [:small [:em "Say something privately (it can be our secret)."]]]
         [:footer
          [:hr]

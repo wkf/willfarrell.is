@@ -510,11 +510,17 @@
      :min-height "100vh"
      :overflow-x :hidden}
 
+    [:main
+     [:a
+      {:color white
+       :border-bottom-color purple}
+      [:&:hover
+       {:border-bottom-color white}]]]
+
     [:.content
      {:min-height "100vh"
       ;; this isn't quite right because it doesn't account for the scrollbar, so it gets calculated dynamically at runtime
       :width "100vw"}]
-
     [:h3
      {:line-height (lines 2)
       :margin {:top (lines 1)
