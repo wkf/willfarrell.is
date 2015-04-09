@@ -7,8 +7,10 @@
             [garden.stylesheet :refer [at-media]]
             [garden.selectors :as s]))
 
+(def vendors ["webkit" "moz" "o"])
+
 (def defaults
-  {:vendors ["webkit"]
+  {:vendors vendors
    :auto-prefix #{:box-align
                   :flex
                   :flex-wrap
@@ -26,7 +28,18 @@
                   :animation-iteration-count
                   :font-smoothing
                   :transform
-                  }})
+                  :transition-property
+                  :transition-duration}})
+
+(defn prefix [v p]
+  (if v (str "-" v "-" p) p))
+
+(defn prefix*
+  ([f] (prefix* f vendors))
+  ([f vendors]
+   (zipmap
+     (map #(str "-" %) vendors)
+     (map f vendors))))
 
 (def black (rgb 0 0 0 ))
 (def purple (rgb 152 90 163))
@@ -389,18 +402,21 @@
        :margin {:top (lines 1)
                 :bottom (lines 1)}}]]]])
 
-(def common
-  [["::selection"
-    {:color white
-     :background purple
-     }]
+(defn transition-transform [transform]
+  (prefix*
+    (fn [v]
+      {:transform transform
+       :transition
+       {:duration "500ms"
+        :property (prefix v "transform")}})))
 
-   [:.scrollbar-measure
-    {:width (px 100)
-     :height (px 100)
-     :overflow :scroll
-     :position :absolute
-     :top (px -9999)}]
+(def common
+  [["::-moz-selection"
+    {:color white
+     :background purple}]
+   ["::selection"
+    {:color white
+     :background purple}]
 
    [:html :body :.page :.menu
     {:height (percent 100)}]
@@ -440,6 +456,13 @@
      :transition {:property :width
                   :duration "500ms"}}]
 
+   [:.page :.menu
+    {:transform :none
+     :transition-property :none}
+    [:.content
+     {:transform :none
+      :transition-property :none}]]
+
    [:.menu
     {:position :fixed
      :transform "translateX(100%)"}
@@ -456,28 +479,22 @@
       :transform :none}
      [:.content
       {:transform :none}]]]
+
    [:.showing-menu
     [:.menu
-     {:transform "translateX(0)"
-      :transition {:property :transform
-                   :duration "500ms"}}
+     (transition-transform "translateX(0)")
      [:.content
-      {:transform "translateX(0)"
-       :transition {:property :transform
-                    :duration "500ms"}}]]]
+      (transition-transform "translateX(0)")]]]
+
    [:.hiding-menu
     [:.page
      [:header
       [:h1 :h2
        {:transform "translateZ(0)"}]]]
     [:.menu
-     {:transform "translateX(-100%)"
-      :transition {:property :transform
-                   :duration "500ms"}}
+     (transition-transform "translateX(-100%)")
      [:.content
-      {:transform "translateX(100%)"
-       :transition {:property :transform
-                    :duration "500ms"}}]]]])
+      (transition-transform "translateX(100%)")]]]])
 
 ;; "cubic-bezier(0, 1, 0.5, 1)"
 

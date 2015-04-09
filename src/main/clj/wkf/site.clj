@@ -15,15 +15,19 @@
 (defn export []
   (fs/export
     {:path "resources/public"
-     :resources ["assets"]
+     :resources ["vendor"
+                 "assets"]
      :manifests {"css" style-manifest
                  "html" markup-manifest}})
   (fw/build-cljs
-    {:source-paths ["src/main/cljs"]
+    {:source-paths ["src/main/cljs"
+                    "resources/vendor/fastclick/lib"]
      :build-options {:output-to "resources/public/js/out/main.js"
                      :output-dir "resources/public/js/out"
+                     :foreign-libs [{:file "resources/vendor/fastclick/lib/fastclick.js"
+                                     :provides ["FastClick"]}]
+                     :externs ["resources/vendor/fastclick/fastclick.externs.js"]
                      :optimizations :advanced
-                     :source-map "resources/public/js/out/main.map"
                      :pretty-print false}}))
 
 (defn ship []

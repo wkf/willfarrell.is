@@ -14,14 +14,15 @@
 (defn markup-manifest []
   (markup/manifest
     {:scripts ["js/out/goog/base.js"
-               "js/out/main.js"]
+               "js/out/main.js" ]
      :requires ["wkf.dev"
                 "wkf.site"]}))
 
 (defsystem* dev
   :serve (serve
            {:port 3450
-            :resources ["assets"
+            :resources ["vendor"
+                        "assets"
                         "target/assets"]
             :manifests {"text/css" style-manifest
                         "text/html" markup-manifest}})
@@ -38,6 +39,9 @@
                                      "src/main/cljs"]
                       :build-options {:output-to "resources/target/assets/js/out/main.js"
                                       :output-dir "resources/target/assets/js/out"
+                                      :foreign-libs [{:file "resources/vendor/fastclick/lib/fastclick.js"
+                                                      :provides ["FastClick"]}]
+                                      :externs ["resources/vendor/fastclick/fastclick.externs.js"]
                                       :optimizations :none
                                       :source-map true
                                       :pretty-print true}})]))

@@ -3,13 +3,14 @@
             [goog.dom.classes :as classes]
             [goog.style :as style]
             [goog.events :as events]
-            [dommy.core :refer-macros [sel sel1] :as dommy]))
+            [dommy.core :refer-macros [sel sel1] :as dommy]
+            [FastClick]))
 
 ;; TODO:
-;;   - fast click
 ;;   - fix elastic/rubber band scrolling
 ;;   - change copy every time you open the menu.
 ;;   - set timeout to remeasure scrollbar width
+;;   - package fastclick for cljsjs
 
 (defonce site
   (atom {:running? false
@@ -57,8 +58,8 @@
 (defn px [n]
   (str n "px"))
 
-(defn scroll-to! [x y]
-  (.scrollTo js/window x y))
+(defn scroll! [x y]
+  (.scroll js/window x y))
 
 (defn measure-line-height
   "A hacky way to get the line height.
@@ -183,11 +184,12 @@
       (swap! site assoc
              :page-scroll y
              :menu-animating? true)
-      (dommy/add-class! html :showing-menu)
+      (dommy/add-class! html
+                        :show-menu
+                        :showing-menu)
       (position! page (- y))
-      (dommy/add-class! html :show-menu)
       (unposition! menu)
-      (scroll-to! x menu-scroll))))
+      (scroll! x menu-scroll))))
 
 (defn on-click-menu-ellipsis [e]
   (when-not (:menu-animating? @site)
@@ -208,7 +210,7 @@
       (position! menu (- y))
       (dommy/remove-class! html :show-menu)
       (unposition! page)
-      (scroll-to! x page-scroll))))
+      (scroll! x page-scroll))))
 
 (defn on-transition-end [e]
   (when (:menu-animating? @site)
@@ -240,6 +242,7 @@
   []
   (when-not (:running? @site)
     (swap! site assoc :running? true)
+    (.attach js/FastClick (.-body js/document))
     (doseq [[el type f] handlers]
       (events/listen el type f))
     (on-resize nil)
