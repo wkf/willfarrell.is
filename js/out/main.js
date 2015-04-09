@@ -10,13 +10,854 @@ if(typeof Math.imul == "undefined" || (Math.imul(0xffffffff,5) == 0)) {
     }
 }
 
+;(function () {
+	'use strict';
+
+	/**
+	 * @preserve FastClick: polyfill to remove click delays on browsers with touch UIs.
+	 *
+	 * @codingstandard ftlabs-jsv2
+	 * @copyright The Financial Times Limited [All Rights Reserved]
+	 * @license MIT License (see LICENSE.txt)
+	 */
+
+	/*jslint browser:true, node:true*/
+	/*global define, Event, Node*/
+
+
+	/**
+	 * Instantiate fast-clicking listeners on the specified layer.
+	 *
+	 * @constructor
+	 * @param {Element} layer The layer to listen on
+	 * @param {Object} [options={}] The options to override the defaults
+	 */
+	function FastClick(layer, options) {
+		var oldOnClick;
+
+		options = options || {};
+
+		/**
+		 * Whether a click is currently being tracked.
+		 *
+		 * @type boolean
+		 */
+		this.trackingClick = false;
+
+
+		/**
+		 * Timestamp for when click tracking started.
+		 *
+		 * @type number
+		 */
+		this.trackingClickStart = 0;
+
+
+		/**
+		 * The element being tracked for a click.
+		 *
+		 * @type EventTarget
+		 */
+		this.targetElement = null;
+
+
+		/**
+		 * X-coordinate of touch start event.
+		 *
+		 * @type number
+		 */
+		this.touchStartX = 0;
+
+
+		/**
+		 * Y-coordinate of touch start event.
+		 *
+		 * @type number
+		 */
+		this.touchStartY = 0;
+
+
+		/**
+		 * ID of the last touch, retrieved from Touch.identifier.
+		 *
+		 * @type number
+		 */
+		this.lastTouchIdentifier = 0;
+
+
+		/**
+		 * Touchmove boundary, beyond which a click will be cancelled.
+		 *
+		 * @type number
+		 */
+		this.touchBoundary = options.touchBoundary || 10;
+
+
+		/**
+		 * The FastClick layer.
+		 *
+		 * @type Element
+		 */
+		this.layer = layer;
+
+		/**
+		 * The minimum time between tap(touchstart and touchend) events
+		 *
+		 * @type number
+		 */
+		this.tapDelay = options.tapDelay || 200;
+
+		/**
+		 * The maximum time for a tap
+		 *
+		 * @type number
+		 */
+		this.tapTimeout = options.tapTimeout || 700;
+
+		if (FastClick.notNeeded(layer)) {
+			return;
+		}
+
+		// Some old versions of Android don't have Function.prototype.bind
+		function bind(method, context) {
+			return function() { return method.apply(context, arguments); };
+		}
+
+
+		var methods = ['onMouse', 'onClick', 'onTouchStart', 'onTouchMove', 'onTouchEnd', 'onTouchCancel'];
+		var context = this;
+		for (var i = 0, l = methods.length; i < l; i++) {
+			context[methods[i]] = bind(context[methods[i]], context);
+		}
+
+		// Set up event handlers as required
+		if (deviceIsAndroid) {
+			layer.addEventListener('mouseover', this.onMouse, true);
+			layer.addEventListener('mousedown', this.onMouse, true);
+			layer.addEventListener('mouseup', this.onMouse, true);
+		}
+
+		layer.addEventListener('click', this.onClick, true);
+		layer.addEventListener('touchstart', this.onTouchStart, false);
+		layer.addEventListener('touchmove', this.onTouchMove, false);
+		layer.addEventListener('touchend', this.onTouchEnd, false);
+		layer.addEventListener('touchcancel', this.onTouchCancel, false);
+
+		// Hack is required for browsers that don't support Event#stopImmediatePropagation (e.g. Android 2)
+		// which is how FastClick normally stops click events bubbling to callbacks registered on the FastClick
+		// layer when they are cancelled.
+		if (!Event.prototype.stopImmediatePropagation) {
+			layer.removeEventListener = function(type, callback, capture) {
+				var rmv = Node.prototype.removeEventListener;
+				if (type === 'click') {
+					rmv.call(layer, type, callback.hijacked || callback, capture);
+				} else {
+					rmv.call(layer, type, callback, capture);
+				}
+			};
+
+			layer.addEventListener = function(type, callback, capture) {
+				var adv = Node.prototype.addEventListener;
+				if (type === 'click') {
+					adv.call(layer, type, callback.hijacked || (callback.hijacked = function(event) {
+						if (!event.propagationStopped) {
+							callback(event);
+						}
+					}), capture);
+				} else {
+					adv.call(layer, type, callback, capture);
+				}
+			};
+		}
+
+		// If a handler is already declared in the element's onclick attribute, it will be fired before
+		// FastClick's onClick handler. Fix this by pulling out the user-defined handler function and
+		// adding it as listener.
+		if (typeof layer.onclick === 'function') {
+
+			// Android browser on at least 3.2 requires a new reference to the function in layer.onclick
+			// - the old one won't work if passed to addEventListener directly.
+			oldOnClick = layer.onclick;
+			layer.addEventListener('click', function(event) {
+				oldOnClick(event);
+			}, false);
+			layer.onclick = null;
+		}
+	}
+
+	/**
+	* Windows Phone 8.1 fakes user agent string to look like Android and iPhone.
+	*
+	* @type boolean
+	*/
+	var deviceIsWindowsPhone = navigator.userAgent.indexOf("Windows Phone") >= 0;
+
+	/**
+	 * Android requires exceptions.
+	 *
+	 * @type boolean
+	 */
+	var deviceIsAndroid = navigator.userAgent.indexOf('Android') > 0 && !deviceIsWindowsPhone;
+
+
+	/**
+	 * iOS requires exceptions.
+	 *
+	 * @type boolean
+	 */
+	var deviceIsIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && !deviceIsWindowsPhone;
+
+
+	/**
+	 * iOS 4 requires an exception for select elements.
+	 *
+	 * @type boolean
+	 */
+	var deviceIsIOS4 = deviceIsIOS && (/OS 4_\d(_\d)?/).test(navigator.userAgent);
+
+
+	/**
+	 * iOS 6.0-7.* requires the target element to be manually derived
+	 *
+	 * @type boolean
+	 */
+	var deviceIsIOSWithBadTarget = deviceIsIOS && (/OS [6-7]_\d/).test(navigator.userAgent);
+
+	/**
+	 * BlackBerry requires exceptions.
+	 *
+	 * @type boolean
+	 */
+	var deviceIsBlackBerry10 = navigator.userAgent.indexOf('BB10') > 0;
+
+	/**
+	 * Determine whether a given element requires a native click.
+	 *
+	 * @param {EventTarget|Element} target Target DOM element
+	 * @returns {boolean} Returns true if the element needs a native click
+	 */
+	FastClick.prototype.needsClick = function(target) {
+		switch (target.nodeName.toLowerCase()) {
+
+		// Don't send a synthetic click to disabled inputs (issue #62)
+		case 'button':
+		case 'select':
+		case 'textarea':
+			if (target.disabled) {
+				return true;
+			}
+
+			break;
+		case 'input':
+
+			// File inputs need real clicks on iOS 6 due to a browser bug (issue #68)
+			if ((deviceIsIOS && target.type === 'file') || target.disabled) {
+				return true;
+			}
+
+			break;
+		case 'label':
+		case 'iframe': // iOS8 homescreen apps can prevent events bubbling into frames
+		case 'video':
+			return true;
+		}
+
+		return (/\bneedsclick\b/).test(target.className);
+	};
+
+
+	/**
+	 * Determine whether a given element requires a call to focus to simulate click into element.
+	 *
+	 * @param {EventTarget|Element} target Target DOM element
+	 * @returns {boolean} Returns true if the element requires a call to focus to simulate native click.
+	 */
+	FastClick.prototype.needsFocus = function(target) {
+		switch (target.nodeName.toLowerCase()) {
+		case 'textarea':
+			return true;
+		case 'select':
+			return !deviceIsAndroid;
+		case 'input':
+			switch (target.type) {
+			case 'button':
+			case 'checkbox':
+			case 'file':
+			case 'image':
+			case 'radio':
+			case 'submit':
+				return false;
+			}
+
+			// No point in attempting to focus disabled inputs
+			return !target.disabled && !target.readOnly;
+		default:
+			return (/\bneedsfocus\b/).test(target.className);
+		}
+	};
+
+
+	/**
+	 * Send a click event to the specified element.
+	 *
+	 * @param {EventTarget|Element} targetElement
+	 * @param {Event} event
+	 */
+	FastClick.prototype.sendClick = function(targetElement, event) {
+		var clickEvent, touch;
+
+		// On some Android devices activeElement needs to be blurred otherwise the synthetic click will have no effect (#24)
+		if (document.activeElement && document.activeElement !== targetElement) {
+			document.activeElement.blur();
+		}
+
+		touch = event.changedTouches[0];
+
+		// Synthesise a click event, with an extra attribute so it can be tracked
+		clickEvent = document.createEvent('MouseEvents');
+		clickEvent.initMouseEvent(this.determineEventType(targetElement), true, true, window, 1, touch.screenX, touch.screenY, touch.clientX, touch.clientY, false, false, false, false, 0, null);
+		clickEvent.forwardedTouchEvent = true;
+		targetElement.dispatchEvent(clickEvent);
+	};
+
+	FastClick.prototype.determineEventType = function(targetElement) {
+
+		//Issue #159: Android Chrome Select Box does not open with a synthetic click event
+		if (deviceIsAndroid && targetElement.tagName.toLowerCase() === 'select') {
+			return 'mousedown';
+		}
+
+		return 'click';
+	};
+
+
+	/**
+	 * @param {EventTarget|Element} targetElement
+	 */
+	FastClick.prototype.focus = function(targetElement) {
+		var length;
+
+		// Issue #160: on iOS 7, some input elements (e.g. date datetime month) throw a vague TypeError on setSelectionRange. These elements don't have an integer value for the selectionStart and selectionEnd properties, but unfortunately that can't be used for detection because accessing the properties also throws a TypeError. Just check the type instead. Filed as Apple bug #15122724.
+		if (deviceIsIOS && targetElement.setSelectionRange && targetElement.type.indexOf('date') !== 0 && targetElement.type !== 'time' && targetElement.type !== 'month') {
+			length = targetElement.value.length;
+			targetElement.setSelectionRange(length, length);
+		} else {
+			targetElement.focus();
+		}
+	};
+
+
+	/**
+	 * Check whether the given target element is a child of a scrollable layer and if so, set a flag on it.
+	 *
+	 * @param {EventTarget|Element} targetElement
+	 */
+	FastClick.prototype.updateScrollParent = function(targetElement) {
+		var scrollParent, parentElement;
+
+		scrollParent = targetElement.fastClickScrollParent;
+
+		// Attempt to discover whether the target element is contained within a scrollable layer. Re-check if the
+		// target element was moved to another parent.
+		if (!scrollParent || !scrollParent.contains(targetElement)) {
+			parentElement = targetElement;
+			do {
+				if (parentElement.scrollHeight > parentElement.offsetHeight) {
+					scrollParent = parentElement;
+					targetElement.fastClickScrollParent = parentElement;
+					break;
+				}
+
+				parentElement = parentElement.parentElement;
+			} while (parentElement);
+		}
+
+		// Always update the scroll top tracker if possible.
+		if (scrollParent) {
+			scrollParent.fastClickLastScrollTop = scrollParent.scrollTop;
+		}
+	};
+
+
+	/**
+	 * @param {EventTarget} targetElement
+	 * @returns {Element|EventTarget}
+	 */
+	FastClick.prototype.getTargetElementFromEventTarget = function(eventTarget) {
+
+		// On some older browsers (notably Safari on iOS 4.1 - see issue #56) the event target may be a text node.
+		if (eventTarget.nodeType === Node.TEXT_NODE) {
+			return eventTarget.parentNode;
+		}
+
+		return eventTarget;
+	};
+
+
+	/**
+	 * On touch start, record the position and scroll offset.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.onTouchStart = function(event) {
+		var targetElement, touch, selection;
+
+		// Ignore multiple touches, otherwise pinch-to-zoom is prevented if both fingers are on the FastClick element (issue #111).
+		if (event.targetTouches.length > 1) {
+			return true;
+		}
+
+		targetElement = this.getTargetElementFromEventTarget(event.target);
+		touch = event.targetTouches[0];
+
+		if (deviceIsIOS) {
+
+			// Only trusted events will deselect text on iOS (issue #49)
+			selection = window.getSelection();
+			if (selection.rangeCount && !selection.isCollapsed) {
+				return true;
+			}
+
+			if (!deviceIsIOS4) {
+
+				// Weird things happen on iOS when an alert or confirm dialog is opened from a click event callback (issue #23):
+				// when the user next taps anywhere else on the page, new touchstart and touchend events are dispatched
+				// with the same identifier as the touch event that previously triggered the click that triggered the alert.
+				// Sadly, there is an issue on iOS 4 that causes some normal touch events to have the same identifier as an
+				// immediately preceeding touch event (issue #52), so this fix is unavailable on that platform.
+				// Issue 120: touch.identifier is 0 when Chrome dev tools 'Emulate touch events' is set with an iOS device UA string,
+				// which causes all touch events to be ignored. As this block only applies to iOS, and iOS identifiers are always long,
+				// random integers, it's safe to to continue if the identifier is 0 here.
+				if (touch.identifier && touch.identifier === this.lastTouchIdentifier) {
+					event.preventDefault();
+					return false;
+				}
+
+				this.lastTouchIdentifier = touch.identifier;
+
+				// If the target element is a child of a scrollable layer (using -webkit-overflow-scrolling: touch) and:
+				// 1) the user does a fling scroll on the scrollable layer
+				// 2) the user stops the fling scroll with another tap
+				// then the event.target of the last 'touchend' event will be the element that was under the user's finger
+				// when the fling scroll was started, causing FastClick to send a click event to that layer - unless a check
+				// is made to ensure that a parent layer was not scrolled before sending a synthetic click (issue #42).
+				this.updateScrollParent(targetElement);
+			}
+		}
+
+		this.trackingClick = true;
+		this.trackingClickStart = event.timeStamp;
+		this.targetElement = targetElement;
+
+		this.touchStartX = touch.pageX;
+		this.touchStartY = touch.pageY;
+
+		// Prevent phantom clicks on fast double-tap (issue #36)
+		if ((event.timeStamp - this.lastClickTime) < this.tapDelay) {
+			event.preventDefault();
+		}
+
+		return true;
+	};
+
+
+	/**
+	 * Based on a touchmove event object, check whether the touch has moved past a boundary since it started.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.touchHasMoved = function(event) {
+		var touch = event.changedTouches[0], boundary = this.touchBoundary;
+
+		if (Math.abs(touch.pageX - this.touchStartX) > boundary || Math.abs(touch.pageY - this.touchStartY) > boundary) {
+			return true;
+		}
+
+		return false;
+	};
+
+
+	/**
+	 * Update the last position.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.onTouchMove = function(event) {
+		if (!this.trackingClick) {
+			return true;
+		}
+
+		// If the touch has moved, cancel the click tracking
+		if (this.targetElement !== this.getTargetElementFromEventTarget(event.target) || this.touchHasMoved(event)) {
+			this.trackingClick = false;
+			this.targetElement = null;
+		}
+
+		return true;
+	};
+
+
+	/**
+	 * Attempt to find the labelled control for the given label element.
+	 *
+	 * @param {EventTarget|HTMLLabelElement} labelElement
+	 * @returns {Element|null}
+	 */
+	FastClick.prototype.findControl = function(labelElement) {
+
+		// Fast path for newer browsers supporting the HTML5 control attribute
+		if (labelElement.control !== undefined) {
+			return labelElement.control;
+		}
+
+		// All browsers under test that support touch events also support the HTML5 htmlFor attribute
+		if (labelElement.htmlFor) {
+			return document.getElementById(labelElement.htmlFor);
+		}
+
+		// If no for attribute exists, attempt to retrieve the first labellable descendant element
+		// the list of which is defined here: http://www.w3.org/TR/html5/forms.html#category-label
+		return labelElement.querySelector('button, input:not([type=hidden]), keygen, meter, output, progress, select, textarea');
+	};
+
+
+	/**
+	 * On touch end, determine whether to send a click event at once.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.onTouchEnd = function(event) {
+		var forElement, trackingClickStart, targetTagName, scrollParent, touch, targetElement = this.targetElement;
+
+		if (!this.trackingClick) {
+			return true;
+		}
+
+		// Prevent phantom clicks on fast double-tap (issue #36)
+		if ((event.timeStamp - this.lastClickTime) < this.tapDelay) {
+			this.cancelNextClick = true;
+			return true;
+		}
+
+		if ((event.timeStamp - this.trackingClickStart) > this.tapTimeout) {
+			return true;
+		}
+
+		// Reset to prevent wrong click cancel on input (issue #156).
+		this.cancelNextClick = false;
+
+		this.lastClickTime = event.timeStamp;
+
+		trackingClickStart = this.trackingClickStart;
+		this.trackingClick = false;
+		this.trackingClickStart = 0;
+
+		// On some iOS devices, the targetElement supplied with the event is invalid if the layer
+		// is performing a transition or scroll, and has to be re-detected manually. Note that
+		// for this to function correctly, it must be called *after* the event target is checked!
+		// See issue #57; also filed as rdar://13048589 .
+		if (deviceIsIOSWithBadTarget) {
+			touch = event.changedTouches[0];
+
+			// In certain cases arguments of elementFromPoint can be negative, so prevent setting targetElement to null
+			targetElement = document.elementFromPoint(touch.pageX - window.pageXOffset, touch.pageY - window.pageYOffset) || targetElement;
+			targetElement.fastClickScrollParent = this.targetElement.fastClickScrollParent;
+		}
+
+		targetTagName = targetElement.tagName.toLowerCase();
+		if (targetTagName === 'label') {
+			forElement = this.findControl(targetElement);
+			if (forElement) {
+				this.focus(targetElement);
+				if (deviceIsAndroid) {
+					return false;
+				}
+
+				targetElement = forElement;
+			}
+		} else if (this.needsFocus(targetElement)) {
+
+			// Case 1: If the touch started a while ago (best guess is 100ms based on tests for issue #36) then focus will be triggered anyway. Return early and unset the target element reference so that the subsequent click will be allowed through.
+			// Case 2: Without this exception for input elements tapped when the document is contained in an iframe, then any inputted text won't be visible even though the value attribute is updated as the user types (issue #37).
+			if ((event.timeStamp - trackingClickStart) > 100 || (deviceIsIOS && window.top !== window && targetTagName === 'input')) {
+				this.targetElement = null;
+				return false;
+			}
+
+			this.focus(targetElement);
+			this.sendClick(targetElement, event);
+
+			// Select elements need the event to go through on iOS 4, otherwise the selector menu won't open.
+			// Also this breaks opening selects when VoiceOver is active on iOS6, iOS7 (and possibly others)
+			if (!deviceIsIOS || targetTagName !== 'select') {
+				this.targetElement = null;
+				event.preventDefault();
+			}
+
+			return false;
+		}
+
+		if (deviceIsIOS && !deviceIsIOS4) {
+
+			// Don't send a synthetic click event if the target element is contained within a parent layer that was scrolled
+			// and this tap is being used to stop the scrolling (usually initiated by a fling - issue #42).
+			scrollParent = targetElement.fastClickScrollParent;
+			if (scrollParent && scrollParent.fastClickLastScrollTop !== scrollParent.scrollTop) {
+				return true;
+			}
+		}
+
+		// Prevent the actual click from going though - unless the target node is marked as requiring
+		// real clicks or if it is in the whitelist in which case only non-programmatic clicks are permitted.
+		if (!this.needsClick(targetElement)) {
+			event.preventDefault();
+			this.sendClick(targetElement, event);
+		}
+
+		return false;
+	};
+
+
+	/**
+	 * On touch cancel, stop tracking the click.
+	 *
+	 * @returns {void}
+	 */
+	FastClick.prototype.onTouchCancel = function() {
+		this.trackingClick = false;
+		this.targetElement = null;
+	};
+
+
+	/**
+	 * Determine mouse events which should be permitted.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.onMouse = function(event) {
+
+		// If a target element was never set (because a touch event was never fired) allow the event
+		if (!this.targetElement) {
+			return true;
+		}
+
+		if (event.forwardedTouchEvent) {
+			return true;
+		}
+
+		// Programmatically generated events targeting a specific element should be permitted
+		if (!event.cancelable) {
+			return true;
+		}
+
+		// Derive and check the target element to see whether the mouse event needs to be permitted;
+		// unless explicitly enabled, prevent non-touch click events from triggering actions,
+		// to prevent ghost/doubleclicks.
+		if (!this.needsClick(this.targetElement) || this.cancelNextClick) {
+
+			// Prevent any user-added listeners declared on FastClick element from being fired.
+			if (event.stopImmediatePropagation) {
+				event.stopImmediatePropagation();
+			} else {
+
+				// Part of the hack for browsers that don't support Event#stopImmediatePropagation (e.g. Android 2)
+				event.propagationStopped = true;
+			}
+
+			// Cancel the event
+			event.stopPropagation();
+			event.preventDefault();
+
+			return false;
+		}
+
+		// If the mouse event is permitted, return true for the action to go through.
+		return true;
+	};
+
+
+	/**
+	 * On actual clicks, determine whether this is a touch-generated click, a click action occurring
+	 * naturally after a delay after a touch (which needs to be cancelled to avoid duplication), or
+	 * an actual click which should be permitted.
+	 *
+	 * @param {Event} event
+	 * @returns {boolean}
+	 */
+	FastClick.prototype.onClick = function(event) {
+		var permitted;
+
+		// It's possible for another FastClick-like library delivered with third-party code to fire a click event before FastClick does (issue #44). In that case, set the click-tracking flag back to false and return early. This will cause onTouchEnd to return early.
+		if (this.trackingClick) {
+			this.targetElement = null;
+			this.trackingClick = false;
+			return true;
+		}
+
+		// Very odd behaviour on iOS (issue #18): if a submit element is present inside a form and the user hits enter in the iOS simulator or clicks the Go button on the pop-up OS keyboard the a kind of 'fake' click event will be triggered with the submit-type input element as the target.
+		if (event.target.type === 'submit' && event.detail === 0) {
+			return true;
+		}
+
+		permitted = this.onMouse(event);
+
+		// Only unset targetElement if the click is not permitted. This will ensure that the check for !targetElement in onMouse fails and the browser's click doesn't go through.
+		if (!permitted) {
+			this.targetElement = null;
+		}
+
+		// If clicks are permitted, return true for the action to go through.
+		return permitted;
+	};
+
+
+	/**
+	 * Remove all FastClick's event listeners.
+	 *
+	 * @returns {void}
+	 */
+	FastClick.prototype.destroy = function() {
+		var layer = this.layer;
+
+		if (deviceIsAndroid) {
+			layer.removeEventListener('mouseover', this.onMouse, true);
+			layer.removeEventListener('mousedown', this.onMouse, true);
+			layer.removeEventListener('mouseup', this.onMouse, true);
+		}
+
+		layer.removeEventListener('click', this.onClick, true);
+		layer.removeEventListener('touchstart', this.onTouchStart, false);
+		layer.removeEventListener('touchmove', this.onTouchMove, false);
+		layer.removeEventListener('touchend', this.onTouchEnd, false);
+		layer.removeEventListener('touchcancel', this.onTouchCancel, false);
+	};
+
+
+	/**
+	 * Check whether FastClick is needed.
+	 *
+	 * @param {Element} layer The layer to listen on
+	 */
+	FastClick.notNeeded = function(layer) {
+		var metaViewport;
+		var chromeVersion;
+		var blackberryVersion;
+		var firefoxVersion;
+
+		// Devices that don't support touch don't need FastClick
+		if (typeof window.ontouchstart === 'undefined') {
+			return true;
+		}
+
+		// Chrome version - zero for other browsers
+		chromeVersion = +(/Chrome\/([0-9]+)/.exec(navigator.userAgent) || [,0])[1];
+
+		if (chromeVersion) {
+
+			if (deviceIsAndroid) {
+				metaViewport = document.querySelector('meta[name=viewport]');
+
+				if (metaViewport) {
+					// Chrome on Android with user-scalable="no" doesn't need FastClick (issue #89)
+					if (metaViewport.content.indexOf('user-scalable=no') !== -1) {
+						return true;
+					}
+					// Chrome 32 and above with width=device-width or less don't need FastClick
+					if (chromeVersion > 31 && document.documentElement.scrollWidth <= window.outerWidth) {
+						return true;
+					}
+				}
+
+			// Chrome desktop doesn't need FastClick (issue #15)
+			} else {
+				return true;
+			}
+		}
+
+		if (deviceIsBlackBerry10) {
+			blackberryVersion = navigator.userAgent.match(/Version\/([0-9]*)\.([0-9]*)/);
+
+			// BlackBerry 10.3+ does not require Fastclick library.
+			// https://github.com/ftlabs/fastclick/issues/251
+			if (blackberryVersion[1] >= 10 && blackberryVersion[2] >= 3) {
+				metaViewport = document.querySelector('meta[name=viewport]');
+
+				if (metaViewport) {
+					// user-scalable=no eliminates click delay.
+					if (metaViewport.content.indexOf('user-scalable=no') !== -1) {
+						return true;
+					}
+					// width=device-width (or less than device-width) eliminates click delay.
+					if (document.documentElement.scrollWidth <= window.outerWidth) {
+						return true;
+					}
+				}
+			}
+		}
+
+		// IE10 with -ms-touch-action: none or manipulation, which disables double-tap-to-zoom (issue #97)
+		if (layer.style.msTouchAction === 'none' || layer.style.touchAction === 'manipulation') {
+			return true;
+		}
+
+		// Firefox version - zero for other browsers
+		firefoxVersion = +(/Firefox\/([0-9]+)/.exec(navigator.userAgent) || [,0])[1];
+
+		if (firefoxVersion >= 27) {
+			// Firefox 27+ does not have tap delay if the content is not zoomable - https://bugzilla.mozilla.org/show_bug.cgi?id=922896
+
+			metaViewport = document.querySelector('meta[name=viewport]');
+			if (metaViewport && (metaViewport.content.indexOf('user-scalable=no') !== -1 || document.documentElement.scrollWidth <= window.outerWidth)) {
+				return true;
+			}
+		}
+
+		// IE11: prefixed -ms-touch-action is no longer supported and it's recomended to use non-prefixed version
+		// http://msdn.microsoft.com/en-us/library/windows/apps/Hh767313.aspx
+		if (layer.style.touchAction === 'none' || layer.style.touchAction === 'manipulation') {
+			return true;
+		}
+
+		return false;
+	};
+
+
+	/**
+	 * Factory method for creating a FastClick object
+	 *
+	 * @param {Element} layer The layer to listen on
+	 * @param {Object} [options={}] The options to override the defaults
+	 */
+	FastClick.attach = function(layer, options) {
+		return new FastClick(layer, options);
+	};
+
+
+	if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
+
+		// AMD. Register as an anonymous module.
+		define(function() {
+			return FastClick;
+		});
+	} else if (typeof module !== 'undefined' && module.exports) {
+		module.exports = FastClick.attach;
+		module.exports.FastClick = FastClick;
+	} else {
+		window.FastClick = FastClick;
+	}
+}());
 
 var h,ba=this;
 function r(a){var b=typeof a;if("object"==b)if(a){if(a instanceof Array)return"array";if(a instanceof Object)return b;var c=Object.prototype.toString.call(a);if("[object Window]"==c)return"object";if("[object Array]"==c||"number"==typeof a.length&&"undefined"!=typeof a.splice&&"undefined"!=typeof a.propertyIsEnumerable&&!a.propertyIsEnumerable("splice"))return"array";if("[object Function]"==c||"undefined"!=typeof a.call&&"undefined"!=typeof a.propertyIsEnumerable&&!a.propertyIsEnumerable("call"))return"function"}else return"null";else if("function"==
-b&&"undefined"==typeof a.call)return"object";return b}function ca(a){return"string"==typeof a}function ea(a){return"number"==typeof a}var fa="closure_uid_"+(1E9*Math.random()>>>0),ga=0;function ja(a,b){var c=Array.prototype.slice.call(arguments,1);return function(){var b=c.slice();b.push.apply(b,arguments);return a.apply(this,b)}};function ka(a){return a.replace(/^[\s\xa0]+|[\s\xa0]+$/g,"")}function la(a){return Array.prototype.join.call(arguments,"")}function ma(a,b){return a<b?-1:a>b?1:0}function oa(a){return String(a).replace(/\-([a-z])/g,function(a,c){return c.toUpperCase()})}function pa(a){var b=ca(void 0)?"undefined".replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g,"\\$1").replace(/\x08/g,"\\x08"):"\\s";return a.replace(new RegExp("(^"+(b?"|["+b+"]+":"")+")([a-z])","g"),function(a,b,e){return b+e.toUpperCase()})};var qa=Array.prototype,sa=qa.indexOf?function(a,b,c){return qa.indexOf.call(a,b,c)}:function(a,b,c){c=null==c?0:0>c?Math.max(0,a.length+c):c;if(ca(a))return ca(b)&&1==b.length?a.indexOf(b,c):-1;for(;c<a.length;c++)if(c in a&&a[c]===b)return c;return-1};function ta(a,b){return a>b?1:a<b?-1:0};var va;a:{var wa=ba.navigator;if(wa){var xa=wa.userAgent;if(xa){va=xa;break a}}va=""};var ya=-1!=va.indexOf("Opera")||-1!=va.indexOf("OPR"),Aa=-1!=va.indexOf("Trident")||-1!=va.indexOf("MSIE"),Ba=-1!=va.indexOf("Gecko")&&-1==va.toLowerCase().indexOf("webkit")&&!(-1!=va.indexOf("Trident")||-1!=va.indexOf("MSIE")),Da=-1!=va.toLowerCase().indexOf("webkit");function Ea(){var a=ba.document;return a?a.documentMode:void 0}
-var Ga=function(){var a="",b;if(ya&&ba.opera)return a=ba.opera.version,"function"==r(a)?a():a;Ba?b=/rv\:([^\);]+)(\)|;)/:Aa?b=/\b(?:MSIE|rv)[: ]([^\);]+)(\)|;)/:Da&&(b=/WebKit\/(\S+)/);b&&(a=(a=b.exec(va))?a[1]:"");return Aa&&(b=Ea(),b>parseFloat(a))?String(b):a}(),Ha={};
+b&&"undefined"==typeof a.call)return"object";return b}function ca(a){return"string"==typeof a}function ea(a){return"number"==typeof a}var fa="closure_uid_"+(1E9*Math.random()>>>0),ga=0;function ha(a,b){var c=Array.prototype.slice.call(arguments,1);return function(){var b=c.slice();b.push.apply(b,arguments);return a.apply(this,b)}};function ka(a){return a.replace(/^[\s\xa0]+|[\s\xa0]+$/g,"")}function la(a){return Array.prototype.join.call(arguments,"")}function ma(a,b){return a<b?-1:a>b?1:0}function oa(a){return String(a).replace(/\-([a-z])/g,function(a,c){return c.toUpperCase()})}function pa(a){var b=ca(void 0)?"undefined".replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g,"\\$1").replace(/\x08/g,"\\x08"):"\\s";return a.replace(new RegExp("(^"+(b?"|["+b+"]+":"")+")([a-z])","g"),function(a,b,e){return b+e.toUpperCase()})};var qa=Array.prototype,sa=qa.indexOf?function(a,b,c){return qa.indexOf.call(a,b,c)}:function(a,b,c){c=null==c?0:0>c?Math.max(0,a.length+c):c;if(ca(a))return ca(b)&&1==b.length?a.indexOf(b,c):-1;for(;c<a.length;c++)if(c in a&&a[c]===b)return c;return-1};function ta(a,b){return a>b?1:a<b?-1:0};var va;a:{var wa=ba.navigator;if(wa){var xa=wa.userAgent;if(xa){va=xa;break a}}va=""};var ya=-1!=va.indexOf("Opera")||-1!=va.indexOf("OPR"),Aa=-1!=va.indexOf("Trident")||-1!=va.indexOf("MSIE"),Ca=-1!=va.indexOf("Gecko")&&-1==va.toLowerCase().indexOf("webkit")&&!(-1!=va.indexOf("Trident")||-1!=va.indexOf("MSIE")),Da=-1!=va.toLowerCase().indexOf("webkit");function Ea(){var a=ba.document;return a?a.documentMode:void 0}
+var Ga=function(){var a="",b;if(ya&&ba.opera)return a=ba.opera.version,"function"==r(a)?a():a;Ca?b=/rv\:([^\);]+)(\)|;)/:Aa?b=/\b(?:MSIE|rv)[: ]([^\);]+)(\)|;)/:Da&&(b=/WebKit\/(\S+)/);b&&(a=(a=b.exec(va))?a[1]:"");return Aa&&(b=Ea(),b>parseFloat(a))?String(b):a}(),Ha={};
 function Ia(a){var b;if(!(b=Ha[a])){b=0;for(var c=ka(String(Ga)).split("."),d=ka(String(a)).split("."),e=Math.max(c.length,d.length),f=0;0==b&&f<e;f++){var g=c[f]||"",k=d[f]||"",l=RegExp("(\\d*)(\\D*)","g"),m=RegExp("(\\d*)(\\D*)","g");do{var n=l.exec(g)||["","",""],p=m.exec(k)||["","",""];if(0==n[0].length&&0==p[0].length)break;b=ma(0==n[1].length?0:parseInt(n[1],10),0==p[1].length?0:parseInt(p[1],10))||ma(0==n[2].length,0==p[2].length)||ma(n[2],p[2])}while(0==b)}b=Ha[a]=0<=b}return b}
-var Ja=ba.document,Ka=Ja&&Aa?Ea()||("CSS1Compat"==Ja.compatMode?parseInt(Ga,10):5):void 0;!Ba&&!Aa||Aa&&Aa&&9<=Ka||Ba&&Ia("1.9.1");Aa&&Ia("9");function Na(a,b){this.x=void 0!==a?a:0;this.y=void 0!==b?b:0}h=Na.prototype;h.clone=function(){return new Na(this.x,this.y)};h.toString=function(){return"("+this.x+", "+this.y+")"};h.ceil=function(){this.x=Math.ceil(this.x);this.y=Math.ceil(this.y);return this};h.floor=function(){this.x=Math.floor(this.x);this.y=Math.floor(this.y);return this};h.round=function(){this.x=Math.round(this.x);this.y=Math.round(this.y);return this};
+var Ja=ba.document,Ka=Ja&&Aa?Ea()||("CSS1Compat"==Ja.compatMode?parseInt(Ga,10):5):void 0;!Ca&&!Aa||Aa&&Aa&&9<=Ka||Ca&&Ia("1.9.1");Aa&&Ia("9");function Na(a,b){this.x=void 0!==a?a:0;this.y=void 0!==b?b:0}h=Na.prototype;h.clone=function(){return new Na(this.x,this.y)};h.toString=function(){return"("+this.x+", "+this.y+")"};h.ceil=function(){this.x=Math.ceil(this.x);this.y=Math.ceil(this.y);return this};h.floor=function(){this.x=Math.floor(this.x);this.y=Math.floor(this.y);return this};h.round=function(){this.x=Math.round(this.x);this.y=Math.round(this.y);return this};
 h.translate=function(a,b){a instanceof Na?(this.x+=a.x,this.y+=a.y):(this.x+=a,ea(b)&&(this.y+=b));return this};h.scale=function(a,b){var c=ea(b)?b:a;this.x*=a;this.y*=c;return this};function Oa(a,b){this.width=a;this.height=b}h=Oa.prototype;h.clone=function(){return new Oa(this.width,this.height)};h.toString=function(){return"("+this.width+" x "+this.height+")"};h.ceil=function(){this.width=Math.ceil(this.width);this.height=Math.ceil(this.height);return this};h.floor=function(){this.width=Math.floor(this.width);this.height=Math.floor(this.height);return this};h.round=function(){this.width=Math.round(this.width);this.height=Math.round(this.height);return this};
 h.scale=function(a,b){var c=ea(b)?b:a;this.width*=a;this.height*=c;return this};function Pa(a,b){for(var c in a)b.call(void 0,a[c],c,a)}function Qa(a){var b=arguments.length;if(1==b&&"array"==r(arguments[0]))return Qa.apply(null,arguments[0]);if(b%2)throw Error("Uneven number of arguments");for(var c={},d=0;d<b;d+=2)c[arguments[d]]=arguments[d+1];return c};function Ra(a,b){null!=a&&this.append.apply(this,arguments)}h=Ra.prototype;h.za="";h.set=function(a){this.za=""+a};h.append=function(a,b,c){this.za+=a;if(null!=b)for(var d=1;d<arguments.length;d++)this.za+=arguments[d];return this};h.clear=function(){this.za=""};h.toString=function(){return this.za};if("undefined"===typeof Ta)var Ta=function(){throw Error("No *print-fn* fn set for evaluation environment");};var Ua=null;if("undefined"===typeof Va)var Va=null;function Wa(){return new Xa(null,5,[Ya,!0,Za,!0,$a,!1,ab,!1,cb,null],null)}function v(a){return null!=a&&!1!==a}function db(a){return a instanceof Array}function eb(a){return v(a)?!1:!0}function w(a,b){return a[r(null==b?null:b)]?!0:a._?!0:!1}function fb(a){return null==a?null:a.constructor}
 function y(a,b){var c=fb(b),c=v(v(c)?c.Jb:c)?c.Ib:r(b);return Error(["No protocol method ",a," defined for type ",c,": ",b].join(""))}function gb(a){var b=a.Ib;return v(b)?b:""+B(a)}var hb="undefined"!==typeof Symbol&&"function"===r(Symbol)?Symbol.iterator:"@@iterator";function ib(a){for(var b=a.length,c=Array(b),d=0;;)if(d<b)c[d]=a[d],d+=1;else break;return c}
@@ -28,7 +869,7 @@ b);return c.call(null,b)},yb={},Ab=function Ab(b,c,d){if(b?b.hb:b)return b.hb(b,
 c){if(b?b.J:b)return b.J(b,c);var d;d=Fb[r(null==b?null:b)];if(!d&&(d=Fb._,!d))throw y("IWithMeta.-with-meta",b);return d.call(null,b,c)},Gb={},Hb=function(){function a(a,b,f){if(a?a.L:a)return a.L(a,b,f);var g;g=c[r(null==a?null:a)];if(!g&&(g=c._,!g))throw y("IReduce.-reduce",a);return g.call(null,a,b,f)}function b(a,b){if(a?a.K:a)return a.K(a,b);var f;f=c[r(null==a?null:a)];if(!f&&(f=c._,!f))throw y("IReduce.-reduce",a);return f.call(null,a,b)}var c=null,c=function(c,e,f){switch(arguments.length){case 2:return b.call(this,
 c,e);case 3:return a.call(this,c,e,f)}throw Error("Invalid arity: "+arguments.length);};c.a=b;c.b=a;return c}(),Ib=function Ib(b,c){if(b?b.n:b)return b.n(b,c);var d;d=Ib[r(null==b?null:b)];if(!d&&(d=Ib._,!d))throw y("IEquiv.-equiv",b);return d.call(null,b,c)},Jb=function Jb(b){if(b?b.w:b)return b.w(b);var c;c=Jb[r(null==b?null:b)];if(!c&&(c=Jb._,!c))throw y("IHash.-hash",b);return c.call(null,b)},Kb={},Lb=function Lb(b){if(b?b.I:b)return b.I(b);var c;c=Lb[r(null==b?null:b)];if(!c&&(c=Lb._,!c))throw y("ISeqable.-seq",
 b);return c.call(null,b)},Mb={},G=function G(b,c){if(b?b.pb:b)return b.pb(0,c);var d;d=G[r(null==b?null:b)];if(!d&&(d=G._,!d))throw y("IWriter.-write",b);return d.call(null,b,c)},Nb={},Ob=function Ob(b,c,d){if(b?b.v:b)return b.v(b,c,d);var e;e=Ob[r(null==b?null:b)];if(!e&&(e=Ob._,!e))throw y("IPrintWithWriter.-pr-writer",b);return e.call(null,b,c,d)},Pb=function Pb(b,c,d){if(b?b.ob:b)return b.ob(0,c,d);var e;e=Pb[r(null==b?null:b)];if(!e&&(e=Pb._,!e))throw y("IWatchable.-notify-watches",b);return e.call(null,
-b,c,d)},Qb=function Qb(b){if(b?b.Ra:b)return b.Ra(b);var c;c=Qb[r(null==b?null:b)];if(!c&&(c=Qb._,!c))throw y("IEditableCollection.-as-transient",b);return c.call(null,b)},Rb=function Rb(b,c){if(b?b.Va:b)return b.Va(b,c);var d;d=Rb[r(null==b?null:b)];if(!d&&(d=Rb._,!d))throw y("ITransientCollection.-conj!",b);return d.call(null,b,c)},Sb=function Sb(b){if(b?b.Wa:b)return b.Wa(b);var c;c=Sb[r(null==b?null:b)];if(!c&&(c=Sb._,!c))throw y("ITransientCollection.-persistent!",b);return c.call(null,b)},Ub=
+b,c,d)},Qb=function Qb(b){if(b?b.Ra:b)return b.Ra(b);var c;c=Qb[r(null==b?null:b)];if(!c&&(c=Qb._,!c))throw y("IEditableCollection.-as-transient",b);return c.call(null,b)},Rb=function Rb(b,c){if(b?b.Va:b)return b.Va(b,c);var d;d=Rb[r(null==b?null:b)];if(!d&&(d=Rb._,!d))throw y("ITransientCollection.-conj!",b);return d.call(null,b,c)},Tb=function Tb(b){if(b?b.Wa:b)return b.Wa(b);var c;c=Tb[r(null==b?null:b)];if(!c&&(c=Tb._,!c))throw y("ITransientCollection.-persistent!",b);return c.call(null,b)},Ub=
 function Ub(b,c,d){if(b?b.Ma:b)return b.Ma(b,c,d);var e;e=Ub[r(null==b?null:b)];if(!e&&(e=Ub._,!e))throw y("ITransientAssociative.-assoc!",b);return e.call(null,b,c,d)},Vb=function Vb(b,c,d){if(b?b.nb:b)return b.nb(0,c,d);var e;e=Vb[r(null==b?null:b)];if(!e&&(e=Vb._,!e))throw y("ITransientVector.-assoc-n!",b);return e.call(null,b,c,d)},Wb=function Wb(b){if(b?b.lb:b)return b.lb();var c;c=Wb[r(null==b?null:b)];if(!c&&(c=Wb._,!c))throw y("IChunk.-drop-first",b);return c.call(null,b)},Xb=function Xb(b){if(b?
 b.cb:b)return b.cb(b);var c;c=Xb[r(null==b?null:b)];if(!c&&(c=Xb._,!c))throw y("IChunkedSeq.-chunked-first",b);return c.call(null,b)},Yb=function Yb(b){if(b?b.eb:b)return b.eb(b);var c;c=Yb[r(null==b?null:b)];if(!c&&(c=Yb._,!c))throw y("IChunkedSeq.-chunked-rest",b);return c.call(null,b)},Zb=function Zb(b){if(b?b.bb:b)return b.bb(b);var c;c=Zb[r(null==b?null:b)];if(!c&&(c=Zb._,!c))throw y("IChunkedNext.-chunked-next",b);return c.call(null,b)},$b=function $b(b,c){if(b?b.Cb:b)return b.Cb(b,c);var d;
 d=$b[r(null==b?null:b)];if(!d&&(d=$b._,!d))throw y("IReset.-reset!",b);return d.call(null,b,c)},ac=function(){function a(a,b,c,d,m){if(a?a.Gb:a)return a.Gb(a,b,c,d,m);var n;n=e[r(null==a?null:a)];if(!n&&(n=e._,!n))throw y("ISwap.-swap!",a);return n.call(null,a,b,c,d,m)}function b(a,b,c,d){if(a?a.Fb:a)return a.Fb(a,b,c,d);var m;m=e[r(null==a?null:a)];if(!m&&(m=e._,!m))throw y("ISwap.-swap!",a);return m.call(null,a,b,c,d)}function c(a,b,c){if(a?a.Eb:a)return a.Eb(a,b,c);var d;d=e[r(null==a?null:a)];
@@ -63,22 +904,22 @@ typeof b)throw Error("index argument to nth must be a number");if(null==a)return
 };c.a=b;c.b=a;return c}(),T=function(){function a(a,b,c){return null!=a?a&&(a.g&256||a.wb)?a.A(null,b,c):db(a)?b<a.length?a[b]:c:"string"===typeof a?b<a.length?a[b]:c:w(rb,a)?sb.b(a,b,c):c:c}function b(a,b){return null==a?null:a&&(a.g&256||a.wb)?a.H(null,b):db(a)?b<a.length?a[b]:null:"string"===typeof a?b<a.length?a[b]:null:w(rb,a)?sb.a(a,b):null}var c=null,c=function(c,e,f){switch(arguments.length){case 2:return b.call(this,c,e);case 3:return a.call(this,c,e,f)}throw Error("Invalid arity: "+arguments.length);
 };c.a=b;c.b=a;return c}(),Nc=function(){function a(a,b,c){return null!=a?tb(a,b,c):Mc([b],[c])}var b=null,c=function(){function a(b,d,k,l){var m=null;if(3<arguments.length){for(var m=0,n=Array(arguments.length-3);m<n.length;)n[m]=arguments[m+3],++m;m=new I(n,0)}return c.call(this,b,d,k,m)}function c(a,d,e,l){for(;;)if(a=b.b(a,d,e),v(l))d=J(l),e=J(M(l)),l=M(M(l));else return a}a.l=3;a.i=function(a){var b=J(a);a=M(a);var d=J(a);a=M(a);var l=J(a);a=L(a);return c(b,d,l,a)};a.f=c;return a}(),b=function(b,
 e,f,g){switch(arguments.length){case 3:return a.call(this,b,e,f);default:var k=null;if(3<arguments.length){for(var k=0,l=Array(arguments.length-3);k<l.length;)l[k]=arguments[k+3],++k;k=new I(l,0)}return c.f(b,e,f,k)}throw Error("Invalid arity: "+arguments.length);};b.l=3;b.i=c.i;b.b=a;b.f=c.f;return b}();function Oc(a){var b="function"==r(a);return v(b)?b:a?v(v(null)?null:a.sb)?!0:a.Tb?!1:w(jb,a):w(jb,a)}function Pc(a,b){this.e=a;this.o=b;this.p=0;this.g=393217}h=Pc.prototype;
-h.call=function(){function a(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ia){a=this.e;return Qc.Sa?Qc.Sa(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ia):Qc.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ia)}function b(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S){a=this;return a.e.ra?a.e.ra(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S)}function c(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A){a=this;return a.e.qa?a.e.qa(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,
+h.call=function(){function a(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ja){a=this.e;return Qc.Sa?Qc.Sa(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ja):Qc.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S,ja)}function b(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S){a=this;return a.e.ra?a.e.ra(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A,S)}function c(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A){a=this;return a.e.qa?a.e.qa(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,
 A):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,A)}function d(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K){a=this;return a.e.pa?a.e.pa(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K)}function e(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D){a=this;return a.e.oa?a.e.oa(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D)}function f(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z){a=this;return a.e.na?a.e.na(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):a.e.call(null,
 b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z)}function g(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x){a=this;return a.e.ma?a.e.ma(b,c,d,e,f,g,k,l,m,n,p,q,t,u,x):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x)}function k(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u){a=this;return a.e.la?a.e.la(b,c,d,e,f,g,k,l,m,n,p,q,t,u):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t,u)}function l(a,b,c,d,e,f,g,k,l,m,n,p,q,t){a=this;return a.e.ka?a.e.ka(b,c,d,e,f,g,k,l,m,n,p,q,t):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q,t)}function m(a,b,c,d,e,f,g,k,l,m,n,p,q){a=this;
 return a.e.ja?a.e.ja(b,c,d,e,f,g,k,l,m,n,p,q):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p,q)}function n(a,b,c,d,e,f,g,k,l,m,n,p){a=this;return a.e.ia?a.e.ia(b,c,d,e,f,g,k,l,m,n,p):a.e.call(null,b,c,d,e,f,g,k,l,m,n,p)}function p(a,b,c,d,e,f,g,k,l,m,n){a=this;return a.e.ha?a.e.ha(b,c,d,e,f,g,k,l,m,n):a.e.call(null,b,c,d,e,f,g,k,l,m,n)}function q(a,b,c,d,e,f,g,k,l,m){a=this;return a.e.ta?a.e.ta(b,c,d,e,f,g,k,l,m):a.e.call(null,b,c,d,e,f,g,k,l,m)}function t(a,b,c,d,e,f,g,k,l){a=this;return a.e.sa?a.e.sa(b,c,
 d,e,f,g,k,l):a.e.call(null,b,c,d,e,f,g,k,l)}function u(a,b,c,d,e,f,g,k){a=this;return a.e.Y?a.e.Y(b,c,d,e,f,g,k):a.e.call(null,b,c,d,e,f,g,k)}function x(a,b,c,d,e,f,g){a=this;return a.e.R?a.e.R(b,c,d,e,f,g):a.e.call(null,b,c,d,e,f,g)}function z(a,b,c,d,e,f){a=this;return a.e.u?a.e.u(b,c,d,e,f):a.e.call(null,b,c,d,e,f)}function D(a,b,c,d,e){a=this;return a.e.j?a.e.j(b,c,d,e):a.e.call(null,b,c,d,e)}function K(a,b,c,d){a=this;return a.e.b?a.e.b(b,c,d):a.e.call(null,b,c,d)}function S(a,b,c){a=this;return a.e.a?
-a.e.a(b,c):a.e.call(null,b,c)}function ia(a,b){a=this;return a.e.c?a.e.c(b):a.e.call(null,b)}function Ma(a){a=this;return a.e.s?a.e.s():a.e.call(null)}var A=null,A=function(A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc,Xc,Ed,Xe,gg){switch(arguments.length){case 1:return Ma.call(this,A);case 2:return ia.call(this,A,Y);case 3:return S.call(this,A,Y,aa);case 4:return K.call(this,A,Y,aa,da);case 5:return D.call(this,A,Y,aa,da,ha);case 6:return z.call(this,A,Y,aa,da,ha,na);case 7:return x.call(this,
-A,Y,aa,da,ha,na,ra);case 8:return u.call(this,A,Y,aa,da,ha,na,ra,ua);case 9:return t.call(this,A,Y,aa,da,ha,na,ra,ua,za);case 10:return q.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca);case 11:return p.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa);case 12:return n.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La);case 13:return m.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa);case 14:return l.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb);case 15:return k.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb);
-case 16:return g.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb);case 17:return f.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb);case 18:return e.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc);case 19:return d.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc,Xc);case 20:return c.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc,Xc,Ed);case 21:return b.call(this,A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc,Xc,Ed,Xe);case 22:return a.call(this,
-A,Y,aa,da,ha,na,ra,ua,za,Ca,Fa,La,Sa,bb,nb,zb,Tb,sc,Xc,Ed,Xe,gg)}throw Error("Invalid arity: "+arguments.length);};A.c=Ma;A.a=ia;A.b=S;A.j=K;A.u=D;A.R=z;A.Y=x;A.sa=u;A.ta=t;A.ha=q;A.ia=p;A.ja=n;A.ka=m;A.la=l;A.ma=k;A.na=g;A.oa=f;A.pa=e;A.qa=d;A.ra=c;A.vb=b;A.Sa=a;return A}();h.apply=function(a,b){return this.call.apply(this,[this].concat(ib(b)))};h.s=function(){return this.e.s?this.e.s():this.e.call(null)};h.c=function(a){return this.e.c?this.e.c(a):this.e.call(null,a)};
+a.e.a(b,c):a.e.call(null,b,c)}function ja(a,b){a=this;return a.e.c?a.e.c(b):a.e.call(null,b)}function Ma(a){a=this;return a.e.s?a.e.s():a.e.call(null)}var A=null,A=function(A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc,Xc,Ed,Xe,gg){switch(arguments.length){case 1:return Ma.call(this,A);case 2:return ja.call(this,A,Y);case 3:return S.call(this,A,Y,aa);case 4:return K.call(this,A,Y,aa,da);case 5:return D.call(this,A,Y,aa,da,ia);case 6:return z.call(this,A,Y,aa,da,ia,na);case 7:return x.call(this,
+A,Y,aa,da,ia,na,ra);case 8:return u.call(this,A,Y,aa,da,ia,na,ra,ua);case 9:return t.call(this,A,Y,aa,da,ia,na,ra,ua,za);case 10:return q.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba);case 11:return p.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa);case 12:return n.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La);case 13:return m.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa);case 14:return l.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb);case 15:return k.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb);
+case 16:return g.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb);case 17:return f.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb);case 18:return e.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc);case 19:return d.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc,Xc);case 20:return c.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc,Xc,Ed);case 21:return b.call(this,A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc,Xc,Ed,Xe);case 22:return a.call(this,
+A,Y,aa,da,ia,na,ra,ua,za,Ba,Fa,La,Sa,bb,nb,zb,Sb,sc,Xc,Ed,Xe,gg)}throw Error("Invalid arity: "+arguments.length);};A.c=Ma;A.a=ja;A.b=S;A.j=K;A.u=D;A.R=z;A.Y=x;A.sa=u;A.ta=t;A.ha=q;A.ia=p;A.ja=n;A.ka=m;A.la=l;A.ma=k;A.na=g;A.oa=f;A.pa=e;A.qa=d;A.ra=c;A.vb=b;A.Sa=a;return A}();h.apply=function(a,b){return this.call.apply(this,[this].concat(ib(b)))};h.s=function(){return this.e.s?this.e.s():this.e.call(null)};h.c=function(a){return this.e.c?this.e.c(a):this.e.call(null,a)};
 h.a=function(a,b){return this.e.a?this.e.a(a,b):this.e.call(null,a,b)};h.b=function(a,b,c){return this.e.b?this.e.b(a,b,c):this.e.call(null,a,b,c)};h.j=function(a,b,c,d){return this.e.j?this.e.j(a,b,c,d):this.e.call(null,a,b,c,d)};h.u=function(a,b,c,d,e){return this.e.u?this.e.u(a,b,c,d,e):this.e.call(null,a,b,c,d,e)};h.R=function(a,b,c,d,e,f){return this.e.R?this.e.R(a,b,c,d,e,f):this.e.call(null,a,b,c,d,e,f)};
 h.Y=function(a,b,c,d,e,f,g){return this.e.Y?this.e.Y(a,b,c,d,e,f,g):this.e.call(null,a,b,c,d,e,f,g)};h.sa=function(a,b,c,d,e,f,g,k){return this.e.sa?this.e.sa(a,b,c,d,e,f,g,k):this.e.call(null,a,b,c,d,e,f,g,k)};h.ta=function(a,b,c,d,e,f,g,k,l){return this.e.ta?this.e.ta(a,b,c,d,e,f,g,k,l):this.e.call(null,a,b,c,d,e,f,g,k,l)};h.ha=function(a,b,c,d,e,f,g,k,l,m){return this.e.ha?this.e.ha(a,b,c,d,e,f,g,k,l,m):this.e.call(null,a,b,c,d,e,f,g,k,l,m)};
 h.ia=function(a,b,c,d,e,f,g,k,l,m,n){return this.e.ia?this.e.ia(a,b,c,d,e,f,g,k,l,m,n):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n)};h.ja=function(a,b,c,d,e,f,g,k,l,m,n,p){return this.e.ja?this.e.ja(a,b,c,d,e,f,g,k,l,m,n,p):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p)};h.ka=function(a,b,c,d,e,f,g,k,l,m,n,p,q){return this.e.ka?this.e.ka(a,b,c,d,e,f,g,k,l,m,n,p,q):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q)};
 h.la=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t){return this.e.la?this.e.la(a,b,c,d,e,f,g,k,l,m,n,p,q,t):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t)};h.ma=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u){return this.e.ma?this.e.ma(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u)};h.na=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x){return this.e.na?this.e.na(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x)};
 h.oa=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z){return this.e.oa?this.e.oa(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z)};h.pa=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D){return this.e.pa?this.e.pa(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D)};
 h.qa=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K){return this.e.qa?this.e.qa(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K)};h.ra=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S){return this.e.ra?this.e.ra(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S):this.e.call(null,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S)};
-h.vb=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia){var Ma=this.e;return Qc.Sa?Qc.Sa(Ma,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia):Qc.call(null,Ma,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia)};h.sb=!0;h.J=function(a,b){return new Pc(this.e,b)};h.C=function(){return this.o};function Rc(a,b){return Oc(a)&&!(a?a.g&262144||a.Rb||(a.g?0:w(Eb,a)):w(Eb,a))?new Pc(a,b):null==a?null:Fb(a,b)}function Sc(a){var b=null!=a;return(b?a?a.g&131072||a.zb||(a.g?0:w(Cb,a)):w(Cb,a):b)?Db(a):null}
+h.vb=function(a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja){var Ma=this.e;return Qc.Sa?Qc.Sa(Ma,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja):Qc.call(null,Ma,a,b,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja)};h.sb=!0;h.J=function(a,b){return new Pc(this.e,b)};h.C=function(){return this.o};function Rc(a,b){return Oc(a)&&!(a?a.g&262144||a.Rb||(a.g?0:w(Eb,a)):w(Eb,a))?new Pc(a,b):null==a?null:Fb(a,b)}function Sc(a){var b=null!=a;return(b?a?a.g&131072||a.zb||(a.g?0:w(Cb,a)):w(Cb,a):b)?Db(a):null}
 function Tc(a){return null==a?!1:a?a.g&1024||a.xb?!0:a.g?!1:w(ub,a):w(ub,a)}function Uc(a){return a?a.g&16384||a.Qb?!0:a.g?!1:w(yb,a):w(yb,a)}function Vc(a){return a?a.p&512||a.Mb?!0:!1:!1}
 var Wc=function(){var a=null,b=function(){function a(c){var f=null;if(0<arguments.length){for(var f=0,g=Array(arguments.length-0);f<g.length;)g[f]=arguments[f+0],++f;f=new I(g,0)}return b.call(this,f)}function b(a){return Qc.a?Qc.a(Qa,a):Qc.call(null,Qa,a)}a.l=0;a.i=function(a){a=H(a);return b(a)};a.f=b;return a}(),a=function(a){switch(arguments.length){case 0:return{};default:var d=null;if(0<arguments.length){for(var d=0,e=Array(arguments.length-0);d<e.length;)e[d]=arguments[d+0],++d;d=new I(e,0)}return b.f(d)}throw Error("Invalid arity: "+
 arguments.length);};a.l=0;a.i=b.i;a.s=function(){return{}};a.f=b.f;return a}();function Yc(a){var b=[];Pa(a,function(a,b){return function(a,c){return b.push(c)}}(a,b));return b}function Zc(a,b,c,d,e){for(;0!==e;)c[d]=a[b],d+=1,--e,b+=1}function $c(a,b,c,d,e){b+=e-1;for(d+=e-1;0!==e;)c[d]=a[b],--d,--e,--b}var ad={};function bd(a){return null==a?!1:a?a.g&64||a.La?!0:a.g?!1:w(pb,a):w(pb,a)}function cd(a){return v(a)?!0:!1}
@@ -119,9 +960,9 @@ arguments[g+3],++g;g=new I(k,0)}return b.f(a,d,e,g)}throw Error("Invalid arity: 
 function Id(a,b,c){var d=H(c);if(0===b)return a.s?a.s():a.call(null);c=E(d);var e=F(d);if(1===b)return a.c?a.c(c):a.c?a.c(c):a.call(null,c);var d=E(e),f=F(e);if(2===b)return a.a?a.a(c,d):a.a?a.a(c,d):a.call(null,c,d);var e=E(f),g=F(f);if(3===b)return a.b?a.b(c,d,e):a.b?a.b(c,d,e):a.call(null,c,d,e);var f=E(g),k=F(g);if(4===b)return a.j?a.j(c,d,e,f):a.j?a.j(c,d,e,f):a.call(null,c,d,e,f);var g=E(k),l=F(k);if(5===b)return a.u?a.u(c,d,e,f,g):a.u?a.u(c,d,e,f,g):a.call(null,c,d,e,f,g);var k=E(l),m=F(l);
 if(6===b)return a.R?a.R(c,d,e,f,g,k):a.R?a.R(c,d,e,f,g,k):a.call(null,c,d,e,f,g,k);var l=E(m),n=F(m);if(7===b)return a.Y?a.Y(c,d,e,f,g,k,l):a.Y?a.Y(c,d,e,f,g,k,l):a.call(null,c,d,e,f,g,k,l);var m=E(n),p=F(n);if(8===b)return a.sa?a.sa(c,d,e,f,g,k,l,m):a.sa?a.sa(c,d,e,f,g,k,l,m):a.call(null,c,d,e,f,g,k,l,m);var n=E(p),q=F(p);if(9===b)return a.ta?a.ta(c,d,e,f,g,k,l,m,n):a.ta?a.ta(c,d,e,f,g,k,l,m,n):a.call(null,c,d,e,f,g,k,l,m,n);var p=E(q),t=F(q);if(10===b)return a.ha?a.ha(c,d,e,f,g,k,l,m,n,p):a.ha?
 a.ha(c,d,e,f,g,k,l,m,n,p):a.call(null,c,d,e,f,g,k,l,m,n,p);var q=E(t),u=F(t);if(11===b)return a.ia?a.ia(c,d,e,f,g,k,l,m,n,p,q):a.ia?a.ia(c,d,e,f,g,k,l,m,n,p,q):a.call(null,c,d,e,f,g,k,l,m,n,p,q);var t=E(u),x=F(u);if(12===b)return a.ja?a.ja(c,d,e,f,g,k,l,m,n,p,q,t):a.ja?a.ja(c,d,e,f,g,k,l,m,n,p,q,t):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t);var u=E(x),z=F(x);if(13===b)return a.ka?a.ka(c,d,e,f,g,k,l,m,n,p,q,t,u):a.ka?a.ka(c,d,e,f,g,k,l,m,n,p,q,t,u):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u);var x=E(z),D=F(z);
-if(14===b)return a.la?a.la(c,d,e,f,g,k,l,m,n,p,q,t,u,x):a.la?a.la(c,d,e,f,g,k,l,m,n,p,q,t,u,x):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x);var z=E(D),K=F(D);if(15===b)return a.ma?a.ma(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):a.ma?a.ma(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z);var D=E(K),S=F(K);if(16===b)return a.na?a.na(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):a.na?a.na(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D);var K=E(S),ia=F(S);if(17===b)return a.oa?
-a.oa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):a.oa?a.oa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K);var S=E(ia),Ma=F(ia);if(18===b)return a.pa?a.pa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S):a.pa?a.pa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S);ia=E(Ma);Ma=F(Ma);if(19===b)return a.qa?a.qa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia):a.qa?a.qa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia);var A=
-E(Ma);F(Ma);if(20===b)return a.ra?a.ra(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia,A):a.ra?a.ra(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia,A):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ia,A);throw Error("Only up to 20 arguments supported on functions");}
+if(14===b)return a.la?a.la(c,d,e,f,g,k,l,m,n,p,q,t,u,x):a.la?a.la(c,d,e,f,g,k,l,m,n,p,q,t,u,x):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x);var z=E(D),K=F(D);if(15===b)return a.ma?a.ma(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):a.ma?a.ma(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z);var D=E(K),S=F(K);if(16===b)return a.na?a.na(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):a.na?a.na(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D);var K=E(S),ja=F(S);if(17===b)return a.oa?
+a.oa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):a.oa?a.oa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K);var S=E(ja),Ma=F(ja);if(18===b)return a.pa?a.pa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S):a.pa?a.pa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S);ja=E(Ma);Ma=F(Ma);if(19===b)return a.qa?a.qa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja):a.qa?a.qa(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja);var A=
+E(Ma);F(Ma);if(20===b)return a.ra?a.ra(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja,A):a.ra?a.ra(c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja,A):a.call(null,c,d,e,f,g,k,l,m,n,p,q,t,u,x,z,D,K,S,ja,A);throw Error("Only up to 20 arguments supported on functions");}
 var Qc=function(){function a(a,b,c,d,e){b=Fd.j(b,c,d,e);c=a.l;return a.i?(d=Bd(b,c+1),d<=c?Id(a,d,b):a.i(b)):a.apply(a,Ad(b))}function b(a,b,c,d){b=Fd.b(b,c,d);c=a.l;return a.i?(d=Bd(b,c+1),d<=c?Id(a,d,b):a.i(b)):a.apply(a,Ad(b))}function c(a,b,c){b=Fd.a(b,c);c=a.l;if(a.i){var d=Bd(b,c+1);return d<=c?Id(a,d,b):a.i(b)}return a.apply(a,Ad(b))}function d(a,b){var c=a.l;if(a.i){var d=Bd(b,c+1);return d<=c?Id(a,d,b):a.i(b)}return a.apply(a,Ad(b))}var e=null,f=function(){function a(c,d,e,f,g,t){var u=null;
 if(5<arguments.length){for(var u=0,x=Array(arguments.length-5);u<x.length;)x[u]=arguments[u+5],++u;u=new I(x,0)}return b.call(this,c,d,e,f,g,u)}function b(a,c,d,e,f,g){c=P(c,P(d,P(e,P(f,Cd(g)))));d=a.l;return a.i?(e=Bd(c,d+1),e<=d?Id(a,e,c):a.i(c)):a.apply(a,Ad(c))}a.l=5;a.i=function(a){var c=J(a);a=M(a);var d=J(a);a=M(a);var e=J(a);a=M(a);var f=J(a);a=M(a);var g=J(a);a=L(a);return b(c,d,e,f,g,a)};a.f=b;return a}(),e=function(e,k,l,m,n,p){switch(arguments.length){case 2:return d.call(this,e,k);case 3:return c.call(this,
 e,k,l);case 4:return b.call(this,e,k,l,m);case 5:return a.call(this,e,k,l,m,n);default:var q=null;if(5<arguments.length){for(var q=0,t=Array(arguments.length-5);q<t.length;)t[q]=arguments[q+5],++q;q=new I(t,0)}return f.f(e,k,l,m,n,q)}throw Error("Invalid arity: "+arguments.length);};e.l=5;e.i=f.i;e.a=d;e.b=c;e.j=b;e.u=a;e.f=f.f;return e}();function Jd(a,b){for(;;){if(null==H(b))return!0;var c;c=J(b);c=a.c?a.c(c):a.call(null,c);if(v(c)){c=a;var d=M(b);a=c;b=d}else return!1}}
@@ -143,7 +984,7 @@ P(e.a(J,b),x(e.a(L,b))):null},null,null)};return e.a(function(){return function(
 function d(a){return b.c?b.c(a):b.call(null,a)}function l(){return b.s?b.s():b.call(null)}var m=null,m=function(a,b){switch(arguments.length){case 0:return l.call(this);case 1:return d.call(this,a);case 2:return c.call(this,a,b)}throw Error("Invalid arity: "+arguments.length);};m.s=l;m.c=d;m.a=c;return m}()}(new Rd(a))}}var c=null,c=function(c,e){switch(arguments.length){case 1:return b.call(this,c);case 2:return a.call(this,c,e)}throw Error("Invalid arity: "+arguments.length);};c.c=b;c.a=a;return c}(),
 Ud=function(){function a(a,b){return Td.a(a,c.c(b))}function b(a){return new sd(null,function(){return P(a,c.c(a))},null,null)}var c=null,c=function(c,e){switch(arguments.length){case 1:return b.call(this,c);case 2:return a.call(this,c,e)}throw Error("Invalid arity: "+arguments.length);};c.c=b;c.a=a;return c}(),Vd=function(){function a(a,c){return new sd(null,function(){var f=H(a),g=H(c);return f&&g?P(J(f),P(J(g),b.a(L(f),L(g)))):null},null,null)}var b=null,c=function(){function a(b,d,k){var l=null;
 if(2<arguments.length){for(var l=0,m=Array(arguments.length-2);l<m.length;)m[l]=arguments[l+2],++l;l=new I(m,0)}return c.call(this,b,d,l)}function c(a,d,e){return new sd(null,function(){var c=Sd.a(H,Kc.f(e,d,Ic([a],0)));return Jd(gd,c)?Dd.a(Sd.a(J,c),Qc.a(b,Sd.a(L,c))):null},null,null)}a.l=2;a.i=function(a){var b=J(a);a=M(a);var d=J(a);a=L(a);return c(b,d,a)};a.f=c;return a}(),b=function(b,e,f){switch(arguments.length){case 2:return a.call(this,b,e);default:var g=null;if(2<arguments.length){for(var g=
-0,k=Array(arguments.length-2);g<k.length;)k[g]=arguments[g+2],++g;g=new I(k,0)}return c.f(b,e,g)}throw Error("Invalid arity: "+arguments.length);};b.l=2;b.i=c.i;b.a=a;b.f=c.f;return b}(),Wd=function(){function a(a,b,c){a&&(a.p&4||a.ub)?(b=hd.j(b,Gd,Qb(a),c),b=Sb(b),a=Rc(b,Sc(a))):a=hd.j(b,Kc,a,c);return a}function b(a,b){var c;null!=a?a&&(a.p&4||a.ub)?(c=fd.b(Rb,Qb(a),b),c=Sb(c),c=Rc(c,Sc(a))):c=fd.b(mb,a,b):c=fd.b(Kc,qc,b);return c}var c=null,c=function(c,e,f){switch(arguments.length){case 2:return b.call(this,
+0,k=Array(arguments.length-2);g<k.length;)k[g]=arguments[g+2],++g;g=new I(k,0)}return c.f(b,e,g)}throw Error("Invalid arity: "+arguments.length);};b.l=2;b.i=c.i;b.a=a;b.f=c.f;return b}(),Wd=function(){function a(a,b,c){a&&(a.p&4||a.ub)?(b=hd.j(b,Gd,Qb(a),c),b=Tb(b),a=Rc(b,Sc(a))):a=hd.j(b,Kc,a,c);return a}function b(a,b){var c;null!=a?a&&(a.p&4||a.ub)?(c=fd.b(Rb,Qb(a),b),c=Tb(c),c=Rc(c,Sc(a))):c=fd.b(mb,a,b):c=fd.b(Kc,qc,b);return c}var c=null,c=function(c,e,f){switch(arguments.length){case 2:return b.call(this,
 c,e);case 3:return a.call(this,c,e,f)}throw Error("Invalid arity: "+arguments.length);};c.a=b;c.b=a;return c}();function Xd(a,b){this.r=a;this.d=b}function Yd(a){return new Xd(a,[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null])}function Zd(a){a=a.h;return 32>a?0:a-1>>>5<<5}function $d(a,b,c){for(;;){if(0===b)return c;var d=Yd(a);d.d[0]=c;c=d;b-=5}}
 var ae=function ae(b,c,d,e){var f=new Xd(d.r,ib(d.d)),g=b.h-1>>>c&31;5===c?f.d[g]=e:(d=d.d[g],b=null!=d?ae(b,c-5,d,e):$d(null,c-5,e),f.d[g]=b);return f};function be(a,b){throw Error([B("No item "),B(a),B(" in vector of length "),B(b)].join(""));}function ce(a,b){if(b>=Zd(a))return a.Q;for(var c=a.root,d=a.shift;;)if(0<d)var e=d-5,c=c.d[b>>>d&31],d=e;else return c.d}function de(a,b){return 0<=b&&b<a.h?ce(a,b):be(b,a.h)}
 var ee=function ee(b,c,d,e,f){var g=new Xd(d.r,ib(d.d));if(0===c)g.d[e&31]=f;else{var k=e>>>c&31;b=ee(b,c-5,d.d[k],e,f);g.d[k]=b}return g};function fe(a,b,c,d,e,f){this.k=a;this.Qa=b;this.d=c;this.wa=d;this.start=e;this.end=f}fe.prototype.jb=function(){return this.k<this.end};fe.prototype.next=function(){32===this.k-this.Qa&&(this.d=ce(this.wa,this.k),this.Qa+=32);var a=this.d[this.k&31];this.k+=1;return a};
@@ -182,7 +1023,7 @@ h.A=function(a,b,c){a=we(this,b);return-1===a?c:this.d[a+1]};h.Ta=function(){ret
 h.Ra=function(){return new Be({},this.d.length,ib(this.d))};h.K=function(a,b){return U.a(b,this)};h.L=function(a,b,c){return U.b(b,c,this)};h.Ha=function(a,b,c){a=we(this,b);if(-1===a){if(this.h<Ce){a=this.d;for(var d=a.length,e=Array(d+2),f=0;;)if(f<d)e[f]=a[f],f+=1;else break;e[d]=b;e[d+1]=c;return new Xa(this.o,this.h+1,e,null)}return Fb(tb(Wd.a(De,this),b,c),this.o)}if(c===this.d[a+1])return this;b=ib(this.d);b[a+1]=c;return new Xa(this.o,this.h,b,null)};
 h.I=function(){var a=this.d;return 0<=a.length-2?new xe(a,0,null):null};h.J=function(a,b){return new Xa(b,this.h,this.d,this.m)};h.G=function(a,b){if(Uc(b))return tb(this,C.a(b,0),C.a(b,1));for(var c=this,d=H(b);;){if(null==d)return c;var e=J(d);if(Uc(e))c=tb(c,C.a(e,0),C.a(e,1)),d=M(d);else throw Error("conj on a map takes map entries or seqables of map entries");}};
 h.call=function(){var a=null,a=function(a,c,d){switch(arguments.length){case 2:return this.H(null,c);case 3:return this.A(null,c,d)}throw Error("Invalid arity: "+arguments.length);};a.a=function(a,c){return this.H(null,c)};a.b=function(a,c,d){return this.A(null,c,d)};return a}();h.apply=function(a,b){return this.call.apply(this,[this].concat(ib(b)))};h.c=function(a){return this.H(null,a)};h.a=function(a,b){return this.A(null,a,b)};var Ee=new Xa(null,0,[],yc),Ce=8;
-function Fe(a){for(var b=a.length,c=0,d=Qb(Ee);;)if(c<b)var e=c+2,d=Ub(d,a[c],a[c+1]),c=e;else return Sb(d)}Xa.prototype[hb]=function(){return N(this)};function Be(a,b,c){this.Ca=a;this.Fa=b;this.d=c;this.p=56;this.g=258}h=Be.prototype;
+function Fe(a){for(var b=a.length,c=0,d=Qb(Ee);;)if(c<b)var e=c+2,d=Ub(d,a[c],a[c+1]),c=e;else return Tb(d)}Xa.prototype[hb]=function(){return N(this)};function Be(a,b,c){this.Ca=a;this.Fa=b;this.d=c;this.p=56;this.g=258}h=Be.prototype;
 h.Ma=function(a,b,c){var d=this;if(v(d.Ca)){a=we(this,b);if(-1===a)return d.Fa+2<=2*Ce?(d.Fa+=2,d.d.push(b),d.d.push(c),this):Hd.b(function(){var a=d.Fa,b=d.d;return Ge.a?Ge.a(a,b):Ge.call(null,a,b)}(),b,c);c!==d.d[a+1]&&(d.d[a+1]=c);return this}throw Error("assoc! after persistent!");};
 h.Va=function(a,b){if(v(this.Ca)){if(b?b.g&2048||b.yb||(b.g?0:w(vb,b)):w(vb,b))return Ub(this,He.c?He.c(b):He.call(null,b),Ie.c?Ie.c(b):Ie.call(null,b));for(var c=H(b),d=this;;){var e=J(c);if(v(e))var f=e,c=M(c),d=Ub(d,function(){var a=f;return He.c?He.c(a):He.call(null,a)}(),function(){var a=f;return Ie.c?Ie.c(a):Ie.call(null,a)}());else return d}}else throw Error("conj! after persistent!");};
 h.Wa=function(){if(v(this.Ca))return this.Ca=!1,new Xa(null,id(this.Fa),this.d,null);throw Error("persistent! called twice");};h.H=function(a,b){return sb.b(this,b,null)};h.A=function(a,b,c){if(v(this.Ca))return a=we(this,b),-1===a?c:this.d[a+1];throw Error("lookup after persistent!");};h.P=function(){if(v(this.Ca))return id(this.Fa);throw Error("count after persistent!");};function Ge(a,b){for(var c=Qb(De),d=0;;)if(d<a)c=Hd.b(c,b[d],b[d+1]),d+=2;else return c}function Je(){this.$=!1}
@@ -211,11 +1052,11 @@ h.forEach=function(a){for(var b=H(this),c=null,d=0,e=0;;)if(e<d){var f=c.t(null,
 h.w=function(){var a=this.m;return null!=a?a:this.m=a=xc(this)};h.n=function(a,b){return te(this,b)};h.Ra=function(){return new Ze({},this.root,this.h,this.W,this.Z)};h.Ha=function(a,b,c){if(null==b)return this.W&&c===this.Z?this:new Ye(this.o,this.W?this.h:this.h+1,this.root,!0,c,null);a=new Je;b=(null==this.root?Pe:this.root).aa(0,mc(b),b,c,a);return b===this.root?this:new Ye(this.o,a.$?this.h+1:this.h,b,this.W,this.Z,null)};
 h.I=function(){if(0<this.h){var a=null!=this.root?this.root.Oa():null;return this.W?P(new W(null,2,5,ke,[null,this.Z],null),a):a}return null};h.J=function(a,b){return new Ye(b,this.h,this.root,this.W,this.Z,this.m)};h.G=function(a,b){if(Uc(b))return tb(this,C.a(b,0),C.a(b,1));for(var c=this,d=H(b);;){if(null==d)return c;var e=J(d);if(Uc(e))c=tb(c,C.a(e,0),C.a(e,1)),d=M(d);else throw Error("conj on a map takes map entries or seqables of map entries");}};
 h.call=function(){var a=null,a=function(a,c,d){switch(arguments.length){case 2:return this.H(null,c);case 3:return this.A(null,c,d)}throw Error("Invalid arity: "+arguments.length);};a.a=function(a,c){return this.H(null,c)};a.b=function(a,c,d){return this.A(null,c,d)};return a}();h.apply=function(a,b){return this.call.apply(this,[this].concat(ib(b)))};h.c=function(a){return this.H(null,a)};h.a=function(a,b){return this.A(null,a,b)};var De=new Ye(null,0,null,!1,null,yc);
-function Mc(a,b){for(var c=a.length,d=0,e=Qb(De);;)if(d<c)var f=d+1,e=e.Ma(null,a[d],b[d]),d=f;else return Sb(e)}Ye.prototype[hb]=function(){return N(this)};function Ze(a,b,c,d,e){this.r=a;this.root=b;this.count=c;this.W=d;this.Z=e;this.p=56;this.g=258}h=Ze.prototype;h.Ma=function(a,b,c){return $e(this,b,c)};h.Va=function(a,b){return af(this,b)};h.Wa=function(){var a;if(this.r)this.r=null,a=new Ye(null,this.count,this.root,this.W,this.Z,null);else throw Error("persistent! called twice");return a};
+function Mc(a,b){for(var c=a.length,d=0,e=Qb(De);;)if(d<c)var f=d+1,e=e.Ma(null,a[d],b[d]),d=f;else return Tb(e)}Ye.prototype[hb]=function(){return N(this)};function Ze(a,b,c,d,e){this.r=a;this.root=b;this.count=c;this.W=d;this.Z=e;this.p=56;this.g=258}h=Ze.prototype;h.Ma=function(a,b,c){return $e(this,b,c)};h.Va=function(a,b){return af(this,b)};h.Wa=function(){var a;if(this.r)this.r=null,a=new Ye(null,this.count,this.root,this.W,this.Z,null);else throw Error("persistent! called twice");return a};
 h.H=function(a,b){return null==b?this.W?this.Z:null:null==this.root?null:this.root.Aa(0,mc(b),b)};h.A=function(a,b,c){return null==b?this.W?this.Z:c:null==this.root?c:this.root.Aa(0,mc(b),b,c)};h.P=function(){if(this.r)return this.count;throw Error("count after persistent!");};
 function af(a,b){if(a.r){if(b?b.g&2048||b.yb||(b.g?0:w(vb,b)):w(vb,b))return $e(a,He.c?He.c(b):He.call(null,b),Ie.c?Ie.c(b):Ie.call(null,b));for(var c=H(b),d=a;;){var e=J(c);if(v(e))var f=e,c=M(c),d=$e(d,function(){var a=f;return He.c?He.c(a):He.call(null,a)}(),function(){var a=f;return Ie.c?Ie.c(a):Ie.call(null,a)}());else return d}}else throw Error("conj! after persistent");}
 function $e(a,b,c){if(a.r){if(null==b)a.Z!==c&&(a.Z=c),a.W||(a.count+=1,a.W=!0);else{var d=new Je;b=(null==a.root?Pe:a.root).ba(a.r,0,mc(b),b,c,d);b!==a.root&&(a.root=b);d.$&&(a.count+=1)}return a}throw Error("assoc! after persistent!");}
-var Ld=function(){function a(a){var d=null;if(0<arguments.length){for(var d=0,e=Array(arguments.length-0);d<e.length;)e[d]=arguments[d+0],++d;d=new I(e,0)}return b.call(this,d)}function b(a){a=H(a);for(var b=Qb(De);;)if(a){var e=M(M(a)),b=Hd.b(b,J(a),J(M(a)));a=e}else return Sb(b)}a.l=0;a.i=function(a){a=H(a);return b(a)};a.f=b;return a}();function bf(a,b){this.N=a;this.U=b;this.p=0;this.g=32374988}h=bf.prototype;h.toString=function(){return dc(this)};h.equiv=function(a){return this.n(null,a)};
+var Ld=function(){function a(a){var d=null;if(0<arguments.length){for(var d=0,e=Array(arguments.length-0);d<e.length;)e[d]=arguments[d+0],++d;d=new I(e,0)}return b.call(this,d)}function b(a){a=H(a);for(var b=Qb(De);;)if(a){var e=M(M(a)),b=Hd.b(b,J(a),J(M(a)));a=e}else return Tb(b)}a.l=0;a.i=function(a){a=H(a);return b(a)};a.f=b;return a}();function bf(a,b){this.N=a;this.U=b;this.p=0;this.g=32374988}h=bf.prototype;h.toString=function(){return dc(this)};h.equiv=function(a){return this.n(null,a)};
 h.C=function(){return this.U};h.S=function(){var a=this.N,a=(a?a.g&128||a.Ua||(a.g?0:w(qb,a)):w(qb,a))?this.N.S(null):M(this.N);return null==a?null:new bf(a,this.U)};h.w=function(){return vc(this)};h.n=function(a,b){return Gc(this,b)};h.K=function(a,b){return U.a(b,this)};h.L=function(a,b,c){return U.b(b,c,this)};h.M=function(){return this.N.M(null).fb()};h.T=function(){var a=this.N,a=(a?a.g&128||a.Ua||(a.g?0:w(qb,a)):w(qb,a))?this.N.S(null):M(this.N);return null!=a?new bf(a,this.U):qc};h.I=function(){return this};
 h.J=function(a,b){return new bf(this.N,b)};h.G=function(a,b){return P(b,this)};bf.prototype[hb]=function(){return N(this)};function ze(a){return(a=H(a))?new bf(a,null):null}function He(a){return wb(a)}function cf(a,b){this.N=a;this.U=b;this.p=0;this.g=32374988}h=cf.prototype;h.toString=function(){return dc(this)};h.equiv=function(a){return this.n(null,a)};h.C=function(){return this.U};
 h.S=function(){var a=this.N,a=(a?a.g&128||a.Ua||(a.g?0:w(qb,a)):w(qb,a))?this.N.S(null):M(this.N);return null==a?null:new cf(a,this.U)};h.w=function(){return vc(this)};h.n=function(a,b){return Gc(this,b)};h.K=function(a,b){return U.a(b,this)};h.L=function(a,b,c){return U.b(b,c,this)};h.M=function(){return this.N.M(null).gb()};h.T=function(){var a=this.N,a=(a?a.g&128||a.Ua||(a.g?0:w(qb,a)):w(qb,a))?this.N.S(null):M(this.N);return null!=a?new cf(a,this.U):qc};h.I=function(){return this};
@@ -240,9 +1081,9 @@ a.l=2;a.i=function(a){var b=J(a);a=M(a);var d=J(a);a=L(a);return c(b,d,a)};a.f=c
 a:for(var k=g;;){var l=k.length,m=Kf(k,c);if(v(m))var n=m+c.length,k=""+B(n<l?[B(k.substring(0,m)),B(k.substr(n+1))].join(""):k.substring(0,m-1));else{c=k;break a}}g!==c&&(a.className=c)}return a}var b=null,c=function(){function a(b,d,k){var l=null;if(2<arguments.length){for(var l=0,m=Array(arguments.length-2);l<m.length;)m[l]=arguments[l+2],++l;l=new I(m,0)}return c.call(this,b,d,l)}function c(a,d,e){d=H(Kc.a(e,d));e=null;for(var l=0,m=0;;)if(m<l){var n=e.t(null,m);b.a(a,n);m+=1}else if(d=H(d))e=
 d,Vc(e)?(d=Xb(e),l=Yb(e),e=d,n=Q(d),d=l,l=n):(n=J(e),b.a(a,n),d=M(e),e=null,l=0),m=0;else return null}a.l=2;a.i=function(a){var b=J(a);a=M(a);var d=J(a);a=L(a);return c(b,d,a)};a.f=c;return a}(),b=function(b,e,f){switch(arguments.length){case 2:return a.call(this,b,e);default:var g=null;if(2<arguments.length){for(var g=0,k=Array(arguments.length-2);g<k.length;)k[g]=arguments[g+2],++g;g=new I(k,0)}return c.f(b,e,g)}throw Error("Invalid arity: "+arguments.length);};b.l=2;b.i=c.i;b.a=a;b.f=c.f;return b}();
 Wd.a(Ee,Sd.a(function(a){var b=R.b(a,0,null),c=R.b(a,1,null);return new W(null,2,5,ke,[b,new Fe([c,function(a,b,c){return function(g){return function(){return function(a){var b=a.relatedTarget,c;c=a.Vb;c=v(c)?c:a.currentTarget;b=v(b)?v(c.contains)?c.contains(b):v(c.compareDocumentPosition)?0!=(c.compareDocumentPosition(b)&16):null:b;return v(b)?null:g.c?g.c(a):g.call(null,a)}}(a,b,c)}}(a,b,c)])],null)},new Xa(null,2,[new V(null,"mouseenter","mouseenter",-1792413560),new V(null,"mouseover","mouseover",
--484272303),new V(null,"mouseleave","mouseleave",531566580),new V(null,"mouseout","mouseout",2049446890)],null)));function Nf(a,b,c){ca(b)?Of(a,c,b):Pa(b,ja(Of,a))}function Of(a,b,c){a:if(c=oa(c),void 0===a.style[c]){var d=(Da?"Webkit":Ba?"Moz":Aa?"ms":ya?"O":null)+pa(c);if(void 0!==a.style[d]){c=d;break a}}c&&(a.style[c]=b)}function Pf(a){"number"==typeof a&&(a=Math.round(a)+"px");return a}
+-484272303),new V(null,"mouseleave","mouseleave",531566580),new V(null,"mouseout","mouseout",2049446890)],null)));function Nf(a,b,c){ca(b)?Of(a,c,b):Pa(b,ha(Of,a))}function Of(a,b,c){a:if(c=oa(c),void 0===a.style[c]){var d=(Da?"Webkit":Ca?"Moz":Aa?"ms":ya?"O":null)+pa(c);if(void 0!==a.style[d]){c=d;break a}}c&&(a.style[c]=b)}function Pf(a){"number"==typeof a&&(a=Math.round(a)+"px");return a}
 function Qf(a){var b=Rf,c;a:{c=9==a.nodeType?a:a.ownerDocument||a.document;if(c.defaultView&&c.defaultView.getComputedStyle&&(c=c.defaultView.getComputedStyle(a,null))){c=c.display||c.getPropertyValue("display")||"";break a}c=""}if("none"!=(c||(a.currentStyle?a.currentStyle.display:null)||a.style&&a.style.display))return b(a);c=a.style;var d=c.display,e=c.visibility,f=c.position;c.visibility="hidden";c.position="absolute";c.display="inline";a=b(a);c.display=d;c.position=f;c.visibility=e;return a}
-function Rf(a){var b=a.offsetWidth,c=a.offsetHeight,d=Da&&!b&&!c;if((void 0===b||d)&&a.getBoundingClientRect){var e;a:{try{e=a.getBoundingClientRect()}catch(f){e={left:0,top:0,right:0,bottom:0};break a}Aa&&a.ownerDocument.body&&(a=a.ownerDocument,e.left-=a.documentElement.clientLeft+a.body.clientLeft,e.top-=a.documentElement.clientTop+a.body.clientTop)}return new Oa(e.right-e.left,e.bottom-e.top)}return new Oa(b,c)};var Sf=!Aa||Aa&&9<=Ka,Tf=Aa&&!Ia("9");!Da||Ia("528");Ba&&Ia("1.9b")||Aa&&Ia("8")||ya&&Ia("9.5")||Da&&Ia("528");Ba&&!Ia("8")||Aa&&Ia("9");function Uf(a,b){this.type=a;this.currentTarget=this.target=b;this.defaultPrevented=this.kb=!1}Uf.prototype.stopPropagation=function(){this.kb=!0};Uf.prototype.preventDefault=function(){this.defaultPrevented=!0};function Vf(a){Vf[" "](a);return a}Vf[" "]=function(){};function Wf(a,b){Uf.call(this,a?a.type:"");this.relatedTarget=this.currentTarget=this.target=null;this.charCode=this.keyCode=this.button=this.screenY=this.screenX=this.clientY=this.clientX=this.offsetY=this.offsetX=0;this.metaKey=this.shiftKey=this.altKey=this.ctrlKey=!1;this.Na=this.state=null;if(a){var c=this.type=a.type;this.target=a.target||a.srcElement;this.currentTarget=b;var d=a.relatedTarget;if(d){if(Ba){var e;a:{try{Vf(d.nodeName);e=!0;break a}catch(f){}e=!1}e||(d=null)}}else"mouseover"==
+function Rf(a){var b=a.offsetWidth,c=a.offsetHeight,d=Da&&!b&&!c;if((void 0===b||d)&&a.getBoundingClientRect){var e;a:{try{e=a.getBoundingClientRect()}catch(f){e={left:0,top:0,right:0,bottom:0};break a}Aa&&a.ownerDocument.body&&(a=a.ownerDocument,e.left-=a.documentElement.clientLeft+a.body.clientLeft,e.top-=a.documentElement.clientTop+a.body.clientTop)}return new Oa(e.right-e.left,e.bottom-e.top)}return new Oa(b,c)};var Sf=!Aa||Aa&&9<=Ka,Tf=Aa&&!Ia("9");!Da||Ia("528");Ca&&Ia("1.9b")||Aa&&Ia("8")||ya&&Ia("9.5")||Da&&Ia("528");Ca&&!Ia("8")||Aa&&Ia("9");function Uf(a,b){this.type=a;this.currentTarget=this.target=b;this.defaultPrevented=this.kb=!1}Uf.prototype.stopPropagation=function(){this.kb=!0};Uf.prototype.preventDefault=function(){this.defaultPrevented=!0};function Vf(a){Vf[" "](a);return a}Vf[" "]=function(){};function Wf(a,b){Uf.call(this,a?a.type:"");this.relatedTarget=this.currentTarget=this.target=null;this.charCode=this.keyCode=this.button=this.screenY=this.screenX=this.clientY=this.clientX=this.offsetY=this.offsetX=0;this.metaKey=this.shiftKey=this.altKey=this.ctrlKey=!1;this.Na=this.state=null;if(a){var c=this.type=a.type;this.target=a.target||a.srcElement;this.currentTarget=b;var d=a.relatedTarget;if(d){if(Ca){var e;a:{try{Vf(d.nodeName);e=!0;break a}catch(f){}e=!1}e||(d=null)}}else"mouseover"==
 c?d=a.fromElement:"mouseout"==c&&(d=a.toElement);this.relatedTarget=d;this.offsetX=Da||void 0!==a.offsetX?a.offsetX:a.layerX;this.offsetY=Da||void 0!==a.offsetY?a.offsetY:a.layerY;this.clientX=void 0!==a.clientX?a.clientX:a.pageX;this.clientY=void 0!==a.clientY?a.clientY:a.pageY;this.screenX=a.screenX||0;this.screenY=a.screenY||0;this.button=a.button;this.keyCode=a.keyCode||0;this.charCode=a.charCode||("keypress"==c?a.keyCode:0);this.ctrlKey=a.ctrlKey;this.altKey=a.altKey;this.shiftKey=a.shiftKey;
 this.metaKey=a.metaKey;this.state=a.state;this.Na=a;a.defaultPrevented&&this.preventDefault()}}(function(){function a(){}a.prototype=Uf.prototype;Wf.qb=Uf.prototype;Wf.prototype=new a;Wf.prototype.constructor=Wf;Wf.Qa=function(a,c,d){return Uf.prototype[c].apply(a,Array.prototype.slice.call(arguments,2))}})();Wf.prototype.stopPropagation=function(){Wf.qb.stopPropagation.call(this);this.Na.stopPropagation?this.Na.stopPropagation():this.Na.cancelBubble=!0};
 Wf.prototype.preventDefault=function(){Wf.qb.preventDefault.call(this);var a=this.Na;if(a.preventDefault)a.preventDefault();else if(a.returnValue=!1,Tf)try{if(a.ctrlKey||112<=a.keyCode&&123>=a.keyCode)a.keyCode=-1}catch(b){}};var Xf="closure_listenable_"+(1E6*Math.random()|0),Yf=0;function Zf(a,b,c,d,e){this.Ga=a;this.Xa=null;this.src=b;this.type=c;this.ab=!!d;this.ib=e;this.key=++Yf;this.Pa=this.$a=!1}function $f(a){a.Pa=!0;a.Ga=null;a.Xa=null;a.src=null;a.ib=null};function ag(a){this.src=a;this.da={};this.Ya=0}ag.prototype.add=function(a,b,c,d,e){var f=a.toString();a=this.da[f];a||(a=this.da[f]=[],this.Ya++);var g=bg(a,b,d,e);-1<g?(b=a[g],c||(b.$a=!1)):(b=new Zf(b,this.src,f,!!d,e),b.$a=c,a.push(b));return b};ag.prototype.remove=function(a,b,c,d){a=a.toString();if(!(a in this.da))return!1;var e=this.da[a];b=bg(e,b,c,d);return-1<b?($f(e[b]),qa.splice.call(e,b,1),0==e.length&&(delete this.da[a],this.Ya--),!0):!1};
@@ -260,8 +1101,7 @@ function Fg(){var a=Qf(sg).height/2,b=document.createElement("div");b.style.cssT
 Gf,Dg(a)],0));a=Bg(tf.c(O.c?O.c(Z):O.call(null,Z)));return Nf(vg,"width",a)}function Gg(a){return function(b){b.preventDefault();a.c?a.c(b):a.call(null,b);return!1}}
 var Hg=function(){function a(a,d){var e=null;if(1<arguments.length){for(var e=0,f=Array(arguments.length-1);e<f.length;)f[e]=arguments[e+1],++e;e=new I(f,0)}return b.call(this,a,e)}function b(a,b){var e=Qc.a(Wc,b);return Nf(a,e)}a.l=1;a.i=function(a){var d=J(a);a=L(a);return b(d,a)};a.f=b;return a}(),Ig=function(){function a(a,d){var e=null;if(1<arguments.length){for(var e=0,f=Array(arguments.length-1);e<f.length;)f[e]=arguments[e+1],++e;e=new I(f,0)}return b.call(this,a,e)}function b(a,b){var e=
 Qc.a(Wc,Vd.a(b,Ud.c("")));return Nf(a,e)}a.l=1;a.i=function(a){var d=J(a);a=L(a);return b(d,a)};a.f=b;return a}(),Jg=new W(null,5,5,ke,[new W(null,3,5,ke,[window,"resize",Fg],null),new W(null,3,5,ke,[window,"scroll",Eg],null),new W(null,3,5,ke,[ug,["transitionend","webkitTransitionEnd","msTransitionEnd","oTransitionEnd"],function(a){return function(b){return rc.a(b.target,b.currentTarget)?a.c?a.c(b):a.call(null,b):null}}(function(){return v(vf.c(O.c?O.c(Z):O.call(null,Z)))?(v(Ff.c(O.c?O.c(Z):O.call(null,
-Z)))?(Mf.a(qg,yf),Qd.j(Z,Nc,Ff,!1)):(Ig.f(wg,Ic(["position","top"],0)),Ig.f(yg,Ic(["position","top"],0)),Mf.a(qg,wf),Qd.j(Z,Nc,Ff,!0)),Qd.j(Z,Nc,vf,!1)):null})],null),new W(null,3,5,ke,[If(rg.getElementsByClassName("ellipsis"))[0],"click",Gg(function(){if(v(vf.c(O.c?O.c(Z):O.call(null,Z))))return null;var a=zg(),b=R.b(a,0,null),a=R.b(a,1,null),c=O.c?O.c(Z):O.call(null,Z),c=bd(c)?Qc.a(Ld,c):c,c=T.a(c,Cf);Qd.f(Z,Nc,of,a,Ic([vf,!0],0));Lf.a(qg,wf);Hg.f(rg,Ic(["top",Bg(-a)],0));Lf.a(qg,Df);Ig.f(ug,Ic(["top"],
-0));return window.scrollTo(b,c)})],null),new W(null,3,5,ke,[If(ug.getElementsByClassName("ellipsis"))[0],"click",Gg(function(){if(v(vf.c(O.c?O.c(Z):O.call(null,Z))))return null;var a=zg(),b=R.b(a,0,null),a=R.b(a,1,null),c=O.c?O.c(Z):O.call(null,Z),d=bd(c)?Qc.a(Ld,c):c,e=T.a(d,Gf),c=T.a(d,of),d=T.a(d,zf),f=bd(e)?Qc.a(Ld,e):e,e=T.a(f,Bf),f=T.a(f,Af);Qd.f(Z,Nc,Cf,a,Ic([vf,!0],0));a>=f&&Hg.f(wg,Ic(["position","absolute","top",Bg(a)],0));a>=e&&eb(d)&&(d=nf.c(O.c?O.c(Z):O.call(null,Z)),Hg.f(yg,Ic(["position",
-"absolute","top",Bg(a+2*d)],0)));Lf.a(qg,yf);Hg.f(ug,Ic(["top",Bg(-a)],0));Mf.a(qg,Df);Ig.f(rg,Ic(["top"],0));return window.scrollTo(b,c)})],null)],null);
-if(!v(pf.c(O.c?O.c(Z):O.call(null,Z)))){Qd.j(Z,Nc,pf,!0);for(var Kg=H(Jg),Lg=null,Mg=0,Ng=0;;)if(Ng<Mg){var Og=Lg.t(null,Ng),Pg=R.b(Og,0,null),Qg=R.b(Og,1,null),Rg=R.b(Og,2,null);fg(Pg,Qg,Rg);Ng+=1}else{var Sg=H(Kg);if(Sg){var Tg=Sg;if(Vc(Tg))var Ug=Xb(Tg),Vg=Yb(Tg),Wg=Ug,Xg=Q(Ug),Kg=Vg,Lg=Wg,Mg=Xg;else{var Yg=J(Tg),Zg=R.b(Yg,0,null),$g=R.b(Yg,1,null),ah=R.b(Yg,2,null);fg(Zg,$g,ah);Kg=M(Tg);Lg=null;Mg=0}Ng=0}else break}Fg();Eg()};
-//# sourceMappingURL=main.map
+Z)))?(Mf.a(qg,yf),Qd.j(Z,Nc,Ff,!1)):(Ig.f(wg,Ic(["position","top"],0)),Ig.f(yg,Ic(["position","top"],0)),Mf.a(qg,wf),Qd.j(Z,Nc,Ff,!0)),Qd.j(Z,Nc,vf,!1)):null})],null),new W(null,3,5,ke,[If(rg.getElementsByClassName("ellipsis"))[0],"click",Gg(function(){if(v(vf.c(O.c?O.c(Z):O.call(null,Z))))return null;var a=zg(),b=R.b(a,0,null),a=R.b(a,1,null),c=O.c?O.c(Z):O.call(null,Z),c=bd(c)?Qc.a(Ld,c):c,c=T.a(c,Cf);Qd.f(Z,Nc,of,a,Ic([vf,!0],0));Lf.f(qg,Df,Ic([wf],0));Hg.f(rg,Ic(["top",Bg(-a)],0));Ig.f(ug,Ic(["top"],
+0));return window.scroll(b,c)})],null),new W(null,3,5,ke,[If(ug.getElementsByClassName("ellipsis"))[0],"click",Gg(function(){if(v(vf.c(O.c?O.c(Z):O.call(null,Z))))return null;var a=zg(),b=R.b(a,0,null),a=R.b(a,1,null),c=O.c?O.c(Z):O.call(null,Z),d=bd(c)?Qc.a(Ld,c):c,e=T.a(d,Gf),c=T.a(d,of),d=T.a(d,zf),f=bd(e)?Qc.a(Ld,e):e,e=T.a(f,Bf),f=T.a(f,Af);Qd.f(Z,Nc,Cf,a,Ic([vf,!0],0));a>=f&&Hg.f(wg,Ic(["position","absolute","top",Bg(a)],0));a>=e&&eb(d)&&(d=nf.c(O.c?O.c(Z):O.call(null,Z)),Hg.f(yg,Ic(["position",
+"absolute","top",Bg(a+2*d)],0)));Lf.a(qg,yf);Hg.f(ug,Ic(["top",Bg(-a)],0));Mf.a(qg,Df);Ig.f(rg,Ic(["top"],0));return window.scroll(b,c)})],null)],null);
+if(!v(pf.c(O.c?O.c(Z):O.call(null,Z)))){Qd.j(Z,Nc,pf,!0);FastClick.attach(document.body);for(var Kg=H(Jg),Lg=null,Mg=0,Ng=0;;)if(Ng<Mg){var Og=Lg.t(null,Ng),Pg=R.b(Og,0,null),Qg=R.b(Og,1,null),Rg=R.b(Og,2,null);fg(Pg,Qg,Rg);Ng+=1}else{var Sg=H(Kg);if(Sg){var Tg=Sg;if(Vc(Tg))var Ug=Xb(Tg),Vg=Yb(Tg),Wg=Ug,Xg=Q(Ug),Kg=Vg,Lg=Wg,Mg=Xg;else{var Yg=J(Tg),Zg=R.b(Yg,0,null),$g=R.b(Yg,1,null),ah=R.b(Yg,2,null);fg(Zg,$g,ah);Kg=M(Tg);Lg=null;Mg=0}Ng=0}else break}Fg();Eg()};
