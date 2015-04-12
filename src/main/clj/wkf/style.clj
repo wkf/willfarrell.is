@@ -285,7 +285,8 @@
   [[:.page :.menu
     [:header
      {:text-align :center
-      :padding [[(lines 1) :auto (lines 1)]]}
+      :padding {:top (lines 1)
+                :bottom (lines 1)}}
 
      [:h1
       {:z-index 1
