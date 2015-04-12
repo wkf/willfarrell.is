@@ -7,10 +7,12 @@
             [FastClick]))
 
 ;; TODO:
+;;   - avoid intro when coming back to site (maybe set cookie?)
 ;;   - fix elastic/rubber band scrolling
 ;;   - change copy every time you open the menu.
 ;;   - set timeout to remeasure scrollbar width
 ;;   - package fastclick for cljsjs
+;;   - change link hover state to avoid fade (maybe come in from side?)
 
 (defonce site
   (atom {:running? false
@@ -124,8 +126,11 @@
 
 (defn on-resize [e]
   (cache-measurements!)
-  (style/setStyle
-    menu-content "width" (px (:content-width @site))))
+  (doseq [el [page-content
+              menu-content]]
+    (style/setStyle
+      el "width" (px (:content-width @site))))
+  (on-scroll nil))
 
 (defn wrap-prevent-default [f]
   (fn [e]
@@ -184,10 +189,10 @@
       (swap! site assoc
              :page-scroll y
              :menu-animating? true)
+      (position! page (- y))
       (dommy/add-class! html
                         :show-menu
                         :showing-menu)
-      (position! page (- y))
       (unposition! menu)
       (scroll! x menu-scroll))))
 
@@ -214,18 +219,16 @@
 
 (defn on-transition-end [e]
   (when (:menu-animating? @site)
+    (swap! site assoc :menu-animating? false)
     (if (:menu-showing? @site)
       (do
         (dommy/remove-class! html :hiding-menu)
-        (swap! site assoc
-               :menu-showing? false))
+        (swap! site assoc :menu-showing? false))
       (do
         (unabsolutize! menu-nav)
         (unabsolutize! menu-hr)
         (dommy/remove-class! html :showing-menu)
-        (swap! site assoc
-               :menu-showing? true)))
-    (swap! site assoc :menu-animating? false)))
+        (swap! site assoc :menu-showing? true)))))
 
 (def handlers
   [[js/window "resize" on-resize]

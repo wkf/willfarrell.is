@@ -47,18 +47,6 @@
 
 (defcssfn url)
 
-(defn ensure-unit [n]
-  (if (number? n) (px n) n))
-
-(defn sides
-  ([n] (sides n n n n))
-  ([n0 n1] (sides n0 n1 n1 n0))
-  ([n0 n1 n2] (sides n0 n1 n1 n2))
-  ([n0 n1 n2 n3] {:top (ensure-unit n0)
-                  :left (ensure-unit n1)
-                  :right (ensure-unit n2)
-                  :bottom (ensure-unit n3)}))
-
 (defn at-large [rules]
   (at-media
     {:screen true
@@ -297,8 +285,7 @@
   [[:.page :.menu
     [:header
      {:text-align :center
-      :padding (sides
-                 (lines 1) :auto (lines 1))}
+      :padding [[(lines 1) :auto (lines 1)]]}
 
      [:h1
       {:z-index 1
@@ -325,7 +312,7 @@
       {:position :absolute
        :left 0
        :right 0
-       :margin (sides 0 :auto)
+       :margin [[0 :auto]]
        :z-index 2
        :transition {:property [:width]
                     :duration "400ms"}}]]]
@@ -403,12 +390,16 @@
                 :bottom (lines 1)}}]]]])
 
 (defn transition-transform [transform]
-  (prefix*
-    (fn [v]
-      {:transform transform
-       :transition
-       {:duration "500ms"
-        :property (prefix v "transform")}})))
+  [:&
+   (prefix*
+     (fn [v]
+       {:transform transform
+        :transition
+        {:duration "300ms"
+         :property (prefix v "transform")}}))
+   (at-large
+     [:&
+      {:transition-duration "500ms"}])])
 
 (def common
   [["::-moz-selection"
@@ -425,6 +416,10 @@
     {:overflow-x :hidden
      :overflow-y :scroll}]
 
+   [:.page
+    {:left 0
+     :right 0}]
+
    [:.page :.menu
     [:.content
      {:min-height "100vh"
@@ -435,7 +430,7 @@
     {:max-width (px 760)
      :margin {:left :auto
               :right :auto}
-     :padding (sides 0 (lines 2))}]
+     :padding [[0 (lines 2)]]}]
 
    [:h3
     {:margin-top (lines 2)}]
