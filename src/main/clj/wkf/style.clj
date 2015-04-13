@@ -28,8 +28,11 @@
                   :animation-iteration-count
                   :font-smoothing
                   :transform
+                  :transform-origin
                   :transition-property
-                  :transition-duration}})
+                  :transition-duration
+                  :transition-timing-function
+                  :backface-visibility}})
 
 (defn prefix [v p]
   (if v (str "-" v "-" p) p))
@@ -61,6 +64,23 @@
   (at-media
     {:screen true
      :min-width (px 460)} rules))
+
+(defn transition-transform
+  ([transform] (transition-transform transform "500ms"))
+  ([transform slow] (transition-transform transform slow "300ms"))
+  ([transform slow fast]
+   [:&
+    {:backface-visibility :hidden}
+    (prefix*
+      (fn [v]
+        {:transform transform
+         :transition
+         {:duration fast
+          :timing-function :ease-in-out
+          :property (prefix v "transform")}}))
+    (at-large
+      [:&
+       {:transition-duration slow}])]))
 
 (def reset
   [[:html
@@ -328,17 +348,22 @@
   [[:.page :.menu
     [:main
      {:margin-top (lines 1)}
-
      [:a
       {:color purple
        :font-weight :bold
-       :border-bottom
-       {:width (px 2)
-        :style :solid
-        :color white}
-       :transition [:border "200ms"]}
-      [:&:hover
-       {:border-bottom-color purple}]]]]])
+       :display :inline-block
+       :position :relative}
+      [:&:before
+       {:content "''"
+        :position :absolute
+        :left 0
+        :right 0
+        :bottom 0
+        :height (px 2)
+        :background purple}
+       (transition-transform "scaleX(0.96)" "200ms" "200ms")]
+      [:&:hover:before
+       {:transform "scaleX(1.04)"}]]]]])
 
 (def splash
   [[:.page
@@ -390,18 +415,6 @@
        :margin {:top (lines 1)
                 :bottom (lines 1)}}]]]])
 
-(defn transition-transform [transform]
-  [:&
-   (prefix*
-     (fn [v]
-       {:transform transform
-        :transition
-        {:duration "300ms"
-         :property (prefix v "transform")}}))
-   (at-large
-     [:&
-      {:transition-duration "500ms"}])])
-
 (def common
   [["::-moz-selection"
     {:color white
@@ -409,6 +422,10 @@
    ["::selection"
     {:color white
      :background purple}]
+
+   [:*
+    {:-moz-osx-font-smoothing :grayscale
+     :-webkit-font-smoothing :antialiased}]
 
    [:html :body :.page :.menu
     {:height (percent 100)}]
@@ -466,15 +483,24 @@
      {:transform "translateX(-100%)"}]]
 
    [:.show-menu
+    [:body
+     {:background purple}]
     [:.page
      {:position :fixed
       :left 0
-      :right 0}]
+      :right 0
+      :visibility :hidden}]
     [:.menu
      {:position :absolute
       :transform :none}
      [:.content
       {:transform :none}]]]
+
+   [:.show-menu.showing-menu
+    [:body
+     {:background :none}]
+    [:.page
+     {:visibility :visible}]]
 
    [:.showing-menu
     [:.menu
@@ -492,8 +518,6 @@
      [:.content
       (transition-transform "translateX(100%)")]]]])
 
-;; "cubic-bezier(0, 1, 0.5, 1)"
-
 (def menu
   [[:.menu
     {:color white
@@ -508,10 +532,10 @@
 
     [:main
      [:a
-      {:color white
-       :border-bottom-color purple}
-      [:&:hover
-       {:border-bottom-color white}]]]
+      {:color white}
+      [:&:before
+       {:bottom (em 0.5)
+        :background white}]]]
 
     [:.content
      {:min-height "100vh"

@@ -8,11 +8,9 @@
 
 ;; TODO:
 ;;   - avoid intro when coming back to site (maybe set cookie?)
-;;   - fix elastic/rubber band scrolling
 ;;   - change copy every time you open the menu.
 ;;   - set timeout to remeasure scrollbar width
 ;;   - package fastclick for cljsjs
-;;   - change link hover state to avoid fade (maybe come in from side?)
 
 (defonce site
   (atom {:running? false
