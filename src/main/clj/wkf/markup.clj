@@ -26,10 +26,17 @@
       [:meta
        {:name "viewport"
         :content "width=device-width, initial-scale=1"}]
-      [:title]]
+      [:title]
+      [:script
+       "(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+        ga('create', 'UA-61999551-1', 'auto');
+        ga('send', 'pageview');"]]
      [:body
       [:section.page
-       [:div.content
+       [:div.wrapper
         [:nav
          [:a.parens
           [:span "( )"]]
@@ -42,12 +49,12 @@
           [:span "I'm a developer. "]
           [:em "It's nice."]]
          [:hr]]
-        [:main]
+        [:main.content]
         [:footer
          [:hr]
          [:small "(c) 2015 Will Farrell"]]]]
       [:section.menu
-       [:div.content
+       [:div.wrapper
         [:nav
          [:a.parens
           [:span "( )"]]
@@ -59,7 +66,7 @@
           [:span "Hit me up. "]
           [:em "Seriously."]]
          [:hr]]
-        [:main
+        [:div.content
          [:h3 [:a {:href "https://github.com/wkf"} "GitHub"]]
          [:small [:em "Take a look at some of my work."]]
          [:h3 [:a {:href "https://twitter.com/wkf"} "Twitter"]]

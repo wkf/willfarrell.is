@@ -20,7 +20,7 @@
          :menu-animating? false
          :line-height 0
          :scroll-width 0
-         :content-width 0
+         :wrapper-width 0
          :page-thresholds
          {:fix-page-nav 0
           :fix-page-hr 0}
@@ -32,14 +32,14 @@
 (def body (sel1 :body))
 
 (def page (sel1 :.page))
-(def page-content (sel1 :.content))
+(def page-wrapper (sel1 :.wrapper))
 (def page-nav (sel1 page :nav))
 (def page-ellipsis (sel1 page :.ellipsis))
 (def page-header (sel1 page :header))
 (def page-hr (sel1 page-header :hr))
 
 (def menu (sel1 :.menu))
-(def menu-content (sel1 menu :.content))
+(def menu-wrapper (sel1 menu :.wrapper))
 (def menu-nav (sel1 menu :nav))
 (def menu-ellipsis (sel1 menu :.ellipsis))
 (def menu-header (sel1 menu :header))
@@ -74,7 +74,7 @@
 (defn measure-window-width []
   (.-innerWidth js/window))
 
-(defn measure-content-width [window-width scroll-width]
+(defn measure-wrapper-width [window-width scroll-width]
   (- window-width scroll-width))
 
 (defn measure-page-thresholds [line-height]
@@ -98,7 +98,7 @@
            :line-height line-height
            :scroll-width scroll-width
            :window-width window-width
-           :content-width (measure-content-width window-width scroll-width)
+           :wrapper-width (measure-wrapper-width window-width scroll-width)
            :page-thresholds (measure-page-thresholds line-height)
            :menu-thresholds (measure-menu-thresholds line-height))))
 
@@ -124,10 +124,10 @@
 
 (defn on-resize [e]
   (cache-measurements!)
-  (doseq [el [page-content
-              menu-content]]
+  (doseq [el [page-wrapper
+              menu-wrapper]]
     (style/setStyle
-      el "width" (px (:content-width @site))))
+      el "width" (px (:wrapper-width @site))))
   (on-scroll nil))
 
 (defn wrap-prevent-default [f]

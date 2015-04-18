@@ -346,7 +346,7 @@
 
 (def main
   [[:.page :.menu
-    [:main
+    [:.content
      {:margin-top (lines 1)}
      [:a
       {:color purple
@@ -361,9 +361,9 @@
         :bottom 0
         :height (px 2)
         :background purple}
-       (transition-transform "scaleX(0.96)" "200ms" "200ms")]
+       (transition-transform "scaleX(0.90)" "200ms" "200ms")]
       [:&:hover:before
-       {:transform "scaleX(1.04)"}]]]]])
+       {:transform "scaleX(1.00)"}]]]]])
 
 (def splash
   [[:.page
@@ -388,7 +388,7 @@
                     :timing-function :ease}}]]]]
 
    [:.page
-    [:nav :main :footer
+    [:nav :.content :footer
      (s/descendant :header :h1)
      (s/descendant :header :hr)
      {:animation {:name fade-in
@@ -439,12 +439,12 @@
      :right 0}]
 
    [:.page :.menu
-    [:.content
+    [:.wrapper
      {:min-height "100vh"
       :position :relative
       :padding-bottom (lines 5)}]]
 
-   [:header :footer :main
+   [:header :footer :.content
     {:max-width (px 760)
      :margin {:left :auto
               :right :auto}
@@ -472,14 +472,14 @@
    [:.page :.menu
     {:transform :none
      :transition-property :none}
-    [:.content
+    [:.wrapper
      {:transform :none
       :transition-property :none}]]
 
    [:.menu
     {:position :fixed
      :transform "translateX(100%)"}
-    [:.content
+    [:.wrapper
      {:transform "translateX(-100%)"}]]
 
    [:.show-menu
@@ -493,7 +493,7 @@
     [:.menu
      {:position :absolute
       :transform :none}
-     [:.content
+     [:.wrapper
       {:transform :none}]]]
 
    [:.show-menu.showing-menu
@@ -505,7 +505,7 @@
    [:.showing-menu
     [:.menu
      (transition-transform "translateX(0)")
-     [:.content
+     [:.wrapper
       (transition-transform "translateX(0)")]]]
 
    [:.hiding-menu
@@ -515,7 +515,7 @@
        {:transform "translateZ(0)"}]]]
     [:.menu
      (transition-transform "translateX(-100%)")
-     [:.content
+     [:.wrapper
       (transition-transform "translateX(100%)")]]]])
 
 (def menu
@@ -530,14 +530,14 @@
      :min-height "100vh"
      :overflow-x :hidden}
 
-    [:main
+    [:.content
      [:a
       {:color white}
       [:&:before
        {:bottom (em 0.5)
         :background white}]]]
 
-    [:.content
+    [:.wrapper
      {:min-height "100vh"
       ;; this isn't quite right because it doesn't account for the scrollbar, so it gets calculated dynamically at runtime
       :width "100vw"}]
