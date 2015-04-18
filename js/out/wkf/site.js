@@ -8,20 +8,20 @@ goog.require('goog.events');
 goog.require('goog.style');
 if(typeof wkf.site.site !== 'undefined'){
 } else {
-wkf.site.site = (function (){var G__30651 = cljs.core.PersistentHashMap.fromArrays([cljs.core.constant$keyword$line_DASH_height,cljs.core.constant$keyword$page_DASH_scroll,cljs.core.constant$keyword$running_QMARK_,cljs.core.constant$keyword$page_DASH_thresholds,cljs.core.constant$keyword$scroll_DASH_width,cljs.core.constant$keyword$content_DASH_width,cljs.core.constant$keyword$menu_DASH_animating_QMARK_,cljs.core.constant$keyword$menu_DASH_scroll,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,cljs.core.constant$keyword$menu_DASH_thresholds],[(0),(0),false,new cljs.core.PersistentArrayMap(null, 2, [cljs.core.constant$keyword$fix_DASH_page_DASH_nav,(0),cljs.core.constant$keyword$fix_DASH_page_DASH_hr,(0)], null),(0),(0),false,(0),false,new cljs.core.PersistentArrayMap(null, 2, [cljs.core.constant$keyword$fix_DASH_menu_DASH_nav,(0),cljs.core.constant$keyword$fix_DASH_menu_DASH_hr,(0)], null)]);
+wkf.site.site = (function (){var G__30651 = cljs.core.PersistentHashMap.fromArrays([cljs.core.constant$keyword$line_DASH_height,cljs.core.constant$keyword$page_DASH_scroll,cljs.core.constant$keyword$running_QMARK_,cljs.core.constant$keyword$page_DASH_thresholds,cljs.core.constant$keyword$scroll_DASH_width,cljs.core.constant$keyword$menu_DASH_animating_QMARK_,cljs.core.constant$keyword$menu_DASH_scroll,cljs.core.constant$keyword$wrapper_DASH_width,cljs.core.constant$keyword$menu_DASH_showing_QMARK_,cljs.core.constant$keyword$menu_DASH_thresholds],[(0),(0),false,new cljs.core.PersistentArrayMap(null, 2, [cljs.core.constant$keyword$fix_DASH_page_DASH_nav,(0),cljs.core.constant$keyword$fix_DASH_page_DASH_hr,(0)], null),(0),false,(0),(0),false,new cljs.core.PersistentArrayMap(null, 2, [cljs.core.constant$keyword$fix_DASH_menu_DASH_nav,(0),cljs.core.constant$keyword$fix_DASH_menu_DASH_hr,(0)], null)]);
 return (cljs.core.atom.cljs$core$IFn$_invoke$arity$1 ? cljs.core.atom.cljs$core$IFn$_invoke$arity$1(G__30651) : cljs.core.atom.call(null,G__30651));
 })();
 }
 wkf.site.html = (dommy.utils.__GT_Array(document.getElementsByTagName("html"))[(0)]);
 wkf.site.body = document.body;
 wkf.site.page = (dommy.utils.__GT_Array(document.getElementsByClassName("page"))[(0)]);
-wkf.site.page_content = (dommy.utils.__GT_Array(document.getElementsByClassName("content"))[(0)]);
+wkf.site.page_wrapper = (dommy.utils.__GT_Array(document.getElementsByClassName("wrapper"))[(0)]);
 wkf.site.page_nav = (dommy.utils.__GT_Array(wkf.site.page.getElementsByTagName("nav"))[(0)]);
 wkf.site.page_ellipsis = (dommy.utils.__GT_Array(wkf.site.page.getElementsByClassName("ellipsis"))[(0)]);
 wkf.site.page_header = (dommy.utils.__GT_Array(wkf.site.page.getElementsByTagName("header"))[(0)]);
 wkf.site.page_hr = (dommy.utils.__GT_Array(wkf.site.page_header.getElementsByTagName("hr"))[(0)]);
 wkf.site.menu = (dommy.utils.__GT_Array(document.getElementsByClassName("menu"))[(0)]);
-wkf.site.menu_content = (dommy.utils.__GT_Array(wkf.site.menu.getElementsByClassName("content"))[(0)]);
+wkf.site.menu_wrapper = (dommy.utils.__GT_Array(wkf.site.menu.getElementsByClassName("wrapper"))[(0)]);
 wkf.site.menu_nav = (dommy.utils.__GT_Array(wkf.site.menu.getElementsByTagName("nav"))[(0)]);
 wkf.site.menu_ellipsis = (dommy.utils.__GT_Array(wkf.site.menu.getElementsByClassName("ellipsis"))[(0)]);
 wkf.site.menu_header = (dommy.utils.__GT_Array(wkf.site.menu.getElementsByTagName("header"))[(0)]);
@@ -59,7 +59,7 @@ return goog.style.getScrollbarWidth();
 wkf.site.measure_window_width = (function wkf$site$measure_window_width(){
 return window.innerWidth;
 });
-wkf.site.measure_content_width = (function wkf$site$measure_content_width(window_width,scroll_width){
+wkf.site.measure_wrapper_width = (function wkf$site$measure_wrapper_width(window_width,scroll_width){
 return (window_width - scroll_width);
 });
 wkf.site.measure_page_thresholds = (function wkf$site$measure_page_thresholds(line_height){
@@ -78,7 +78,7 @@ wkf.site.cache_measurements_BANG_ = (function wkf$site$cache_measurements_BANG_(
 var line_height = wkf.site.measure_line_height();
 var scroll_width = wkf.site.measure_scroll_width();
 var window_width = wkf.site.measure_window_width();
-return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$at_DASH_large_QMARK_,(window_width >= (860)),cljs.core.array_seq([cljs.core.constant$keyword$at_DASH_medium_QMARK_,(window_width >= (680)),cljs.core.constant$keyword$at_DASH_small_QMARK_,(window_width >= (460)),cljs.core.constant$keyword$line_DASH_height,line_height,cljs.core.constant$keyword$scroll_DASH_width,scroll_width,cljs.core.constant$keyword$window_DASH_width,window_width,cljs.core.constant$keyword$content_DASH_width,wkf.site.measure_content_width(window_width,scroll_width),cljs.core.constant$keyword$page_DASH_thresholds,wkf.site.measure_page_thresholds(line_height),cljs.core.constant$keyword$menu_DASH_thresholds,wkf.site.measure_menu_thresholds(line_height)], 0));
+return cljs.core.swap_BANG_.cljs$core$IFn$_invoke$arity$variadic(wkf.site.site,cljs.core.assoc,cljs.core.constant$keyword$at_DASH_large_QMARK_,(window_width >= (860)),cljs.core.array_seq([cljs.core.constant$keyword$at_DASH_medium_QMARK_,(window_width >= (680)),cljs.core.constant$keyword$at_DASH_small_QMARK_,(window_width >= (460)),cljs.core.constant$keyword$line_DASH_height,line_height,cljs.core.constant$keyword$scroll_DASH_width,scroll_width,cljs.core.constant$keyword$window_DASH_width,window_width,cljs.core.constant$keyword$wrapper_DASH_width,wkf.site.measure_wrapper_width(window_width,scroll_width),cljs.core.constant$keyword$page_DASH_thresholds,wkf.site.measure_page_thresholds(line_height),cljs.core.constant$keyword$menu_DASH_thresholds,wkf.site.measure_menu_thresholds(line_height)], 0));
 });
 wkf.site.on_scroll = (function wkf$site$on_scroll(e){
 var map__30678 = (function (){var G__30681 = wkf.site.site;
@@ -234,7 +234,7 @@ break;
 wkf.site.on_resize = (function wkf$site$on_resize(e){
 wkf.site.cache_measurements_BANG_();
 
-var seq__30745_30757 = cljs.core.seq(new cljs.core.PersistentVector(null, 2, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.page_content,wkf.site.menu_content], null));
+var seq__30745_30757 = cljs.core.seq(new cljs.core.PersistentVector(null, 2, 5, cljs.core.PersistentVector.EMPTY_NODE, [wkf.site.page_wrapper,wkf.site.menu_wrapper], null));
 var chunk__30746_30758 = null;
 var count__30747_30759 = (0);
 var i__30748_30760 = (0);
@@ -243,7 +243,7 @@ if((i__30748_30760 < count__30747_30759)){
 var el_30761 = chunk__30746_30758.cljs$core$IIndexed$_nth$arity$2(null,i__30748_30760);
 var G__30749_30762 = el_30761;
 var G__30750_30763 = "width";
-var G__30751_30764 = wkf.site.px(cljs.core.constant$keyword$content_DASH_width.cljs$core$IFn$_invoke$arity$1((function (){var G__30752 = wkf.site.site;
+var G__30751_30764 = wkf.site.px(cljs.core.constant$keyword$wrapper_DASH_width.cljs$core$IFn$_invoke$arity$1((function (){var G__30752 = wkf.site.site;
 return (cljs.core.deref.cljs$core$IFn$_invoke$arity$1 ? cljs.core.deref.cljs$core$IFn$_invoke$arity$1(G__30752) : cljs.core.deref.call(null,G__30752));
 })()));
 goog.style.setStyle(G__30749_30762,G__30750_30763,G__30751_30764);
@@ -276,7 +276,7 @@ continue;
 var el_30776 = cljs.core.first(seq__30745_30770__$1);
 var G__30753_30777 = el_30776;
 var G__30754_30778 = "width";
-var G__30755_30779 = wkf.site.px(cljs.core.constant$keyword$content_DASH_width.cljs$core$IFn$_invoke$arity$1((function (){var G__30756 = wkf.site.site;
+var G__30755_30779 = wkf.site.px(cljs.core.constant$keyword$wrapper_DASH_width.cljs$core$IFn$_invoke$arity$1((function (){var G__30756 = wkf.site.site;
 return (cljs.core.deref.cljs$core$IFn$_invoke$arity$1 ? cljs.core.deref.cljs$core$IFn$_invoke$arity$1(G__30756) : cljs.core.deref.call(null,G__30756));
 })()));
 goog.style.setStyle(G__30753_30777,G__30754_30778,G__30755_30779);
