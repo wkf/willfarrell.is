@@ -99,7 +99,20 @@
 .link a {
     color: black;
     text-decoration: none;
-    border-bottom: solid 1px #a461af;
+    position: relative;
+}
+.link a:before {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: #a461af;
+    transition: all ease 200ms;
+}
+.link:hover a:before {
+    transform: translateY(2px);
 }
 .link a:visited {
     color: black
