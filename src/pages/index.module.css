@@ -1,0 +1,82 @@
+.throbber {
+    margin: 50px auto 22px;
+    width: 260px;
+    height: 260px;
+}
+.first {
+    border-radius: 50%;
+    width: 260px;
+    height: 260px;
+    background: rgba(234, 234, 234, 0.3);
+}
+.second {
+    border-radius: 50%;
+    width: 200px;
+    height: 200px;
+    position: relative;
+    left: 30px;
+    top: 30px;
+    background: rgba(234, 234, 234, 0.6);
+}
+.third {
+    border-radius: 50%;
+    width: 160px;
+    height: 160px;
+    position: relative;
+    left: 20px;
+    top: 20px;
+    background: rgba(234, 234, 234, 0.8);
+}
+.fourth {
+    border-radius: 50%;
+    width: 140px;
+    height: 140px;
+    position: relative;
+    left: 10px;
+    top: 10px;
+    background: #eaeaea;
+}
+.painting {
+    position: relative;
+    left: 29px;
+    top: 14px;
+}
+.headline {
+    font-family: "Sentinel SSm A", "Sentinel SSm B";
+    font-style: normal;
+    font-weight: 500;
+    font-size: 36px;
+    letter-spacing: 5px;
+    text-align: center;
+    color: #241816;
+}
+.links {
+    list-style-type: none;
+    padding: 0;
+    margin: 50px auto;
+    display: flex;
+    width: 260px;
+    height: 260px;
+}
+.link {
+    font-family: "Chronicle SSm A", "Chronicle SSm B";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 12px;
+    text-align: center;
+    flex-grow: 1;
+}
+.link a {
+    color: black;
+    text-decoration: none;
+    border-bottom: solid 1px #a461af;
+}
+.link a:visited {
+    color: black
+}
+.link a:hover {
+    color: black
+}
+.link a:active {
+    color: black
+}
