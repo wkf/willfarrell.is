@@ -5,21 +5,17 @@ import painting from './painting.png';
 
 const Throbber = () =>
   <div className={styles.throbber}>
-    <div className={styles.first}>
-      <div className={styles.second}>
-        <div className={styles.third}>
-          <div className={styles.fourth}>
-            <img
-              className={styles.painting}
-              src={painting}
-              alt="Painting"
-              width="83"
-              height="111"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <div className={styles.first} />
+    <div className={styles.second} />
+    <div className={styles.third} />
+    <div className={styles.fourth} />
+    <img
+      className={styles.painting}
+      src={painting}
+      alt="Painting"
+      width="83"
+      height="111"
+    />
   </div>;
 
 const IndexPage = () =>
