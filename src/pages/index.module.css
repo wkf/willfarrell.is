@@ -24,6 +24,18 @@
     50% {transform: scale(1.1, 1.1)};
     100% {transform: scale(1, 1);}
 }
+.throbber:hover .first {
+    transform: scale(1.1);
+}
+.throbber:hover .second {
+    transform: scale(1.1);
+}
+.throbber:hover .third {
+    transform: scale(1.1);
+}
+.throbber:hover .fourth {
+    transform: scale(1.1);
+}
 .throbber {
     margin: 50px auto 22px;
     width: 260px;
@@ -36,6 +48,7 @@
     height: 260px;
     background: rgba(234, 234, 234, 0.3);
     animation: throb-1 3s 1;
+    transition: all 600ms ease 250ms;
 }
 .second {
     border-radius: 50%;
@@ -46,6 +59,7 @@
     top: 30px;
     background: rgba(234, 234, 234, 0.6);
     animation: throb-2 3s 1;
+    transition: all 600ms ease 200ms;
 }
 .third {
     border-radius: 50%;
@@ -56,6 +70,7 @@
     top: 50px;
     background: rgba(234, 234, 234, 0.8);
     animation: throb-3 3s 1;
+    transition: all 600ms ease 150ms;
 }
 .fourth {
     border-radius: 50%;
@@ -66,6 +81,7 @@
     top: 60px;
     background: #eaeaea;
     animation: throb-4 3s 1;
+    transition: all 600ms ease;
 }
 .painting {
     position: absolute;
